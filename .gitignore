@@ -1,0 +1,20 @@
+# Build output
+build/
+out/
+cmake-build-*/
+
+# Binaries
+*.exe
+*.dll
+*.obj
+*.o
+*.a
+*.lib
+*.pdb
+
+# IDE / OS
+.vs/
+*.user
+.DS_Store
+Thumbs.db
+desktop.ini
