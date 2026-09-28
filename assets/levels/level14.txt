@@ -1,0 +1,30 @@
+################################
+#.........T.DDDDDD.T..........2#
+#.P.........DDDDDD.............#
+#.......C...DDDDDD...C.......C.#
+#...........DDDDDD.............#
+#W..........DDDDDD.............#
+#W.........................TTT.#
+#W.........................TTT.#
+#W..........C..................#
+#.......2...............#....KK#
+#.......................#......#
+#######.................#......#
+#.....#.....................C..#
+#.......................#......#
+#..C..#.........C.......#..UUU.#
+#.....#.................#..UUU.#
+#WWWW1#...............1.#.....E#
+################################
+
+name The Guest Bedroom
+room bedroom
+rug 10,7 10,4 blue
+# Legend: # wall  . floor  P start  C cheese  E exit  R red pepper  1-4 mouse holes (same digit = linked)
+# Furniture (solid): B shelf T table K counter A appliance S sofa/seats D bed G pool table U tub/fountain
+#                    L plant X boxes Q piano F fireplace W wardrobe Y car
+# cat <tabby|sleepy|hunter|blind> x,y x,y ...  walks the waypoints forward, then back
+cat tabby 8,7 22,7
+cat sleepy 15,12
+cat blind 26,9 26,16
+cat hunter 8,15 22,15

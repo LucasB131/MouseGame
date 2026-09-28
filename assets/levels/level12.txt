@@ -1,0 +1,29 @@
+################################
+#..AAAAAAAA.1.KKKK.............#
+#............................C.#
+#P..................XX.........#
+#...C...........C...XX........B#
+#.............................B#
+#.............................B#
+#.....TTTTTTTT..........C.....B#
+#.....TTTTTTTT................B#
+#.............................B#
+#.........C...............XX..B#
+#.............................B#
+######..#####..................#
+#...........................2..#
+#...C.................C........#
+#..............................#
+#1BBBB...........2............E#
+################################
+
+name The Laundry Room
+room laundry
+# Legend: # wall  . floor  P start  C cheese  E exit  R red pepper  1-4 mouse holes (same digit = linked)
+# Furniture (solid): B shelf T table K counter A appliance S sofa/seats D bed G pool table U tub/fountain
+#                    L plant X boxes Q piano F fireplace W wardrobe Y car
+# cat <tabby|sleepy|hunter|blind> x,y x,y ...  walks the waypoints forward, then back
+cat blind 3,10 16,10
+cat tabby 16,3 16,10
+cat blind 22,6 28,6
+cat sleepy 25,14

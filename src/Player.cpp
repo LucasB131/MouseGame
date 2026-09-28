@@ -61,14 +61,14 @@ void Player::ResolveWallCollisions(const Level& level)
     }
 }
 
-void Player::Draw() const
+void Player::Draw(bool flashRed) const
 {
     const Vector2 side{-facing_.y, facing_.x};
     const Vector2 earBase = Vector2Add(pos_, Vector2Scale(facing_, 4.0f));
     const Vector2 tailBase = Vector2Subtract(pos_, Vector2Scale(facing_, radius_));
 
     DrawLineEx(tailBase, Vector2Subtract(tailBase, Vector2Scale(facing_, 14.0f)), 3.0f, PINK);   // tail
-    DrawCircleV(pos_, radius_, LIGHTGRAY);                                                       // body
+    DrawCircleV(pos_, radius_, flashRed ? Color{235, 60, 50, 255} : LIGHTGRAY);                  // body
     DrawCircleV(Vector2Add(earBase, Vector2Scale(side, 10.0f)), 6.0f, PINK);                     // ears
     DrawCircleV(Vector2Subtract(earBase, Vector2Scale(side, 10.0f)), 6.0f, PINK);
     DrawCircleV(Vector2Add(pos_, Vector2Scale(facing_, radius_)), 3.5f, Color{60, 40, 40, 255}); // nose

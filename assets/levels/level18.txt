@@ -1,0 +1,31 @@
+################################
+#WWWWWW.#..T.DDDDDD.T..#2..UUUU#
+#......1#.C..DDDDDD....#...UUUU#
+#..C.........DDDDDD..C.#.......#
+#.......#....DDDDDD....#....C..#
+#.......#....DDDDDD....#.......#
+#########..............#.....KK#
+#F.....................#.......#
+#F.............................#
+#F..C...........C..............#
+#..................TT..#.......#
+#..S...............TT..#.......#
+#..S.TT................#......A#
+#..S...................#.......#
+#......................#.......#
+#.........C............#...C...#
+#P.......2....WWWWWW..1#L.....E#
+################################
+
+name The Master Bedroom
+room bedroom
+rug 2,10 8,5 red
+rug 11,7 10,2 gold
+# Legend: # wall  . floor  P start  C cheese  E exit  R red pepper  1-4 mouse holes (same digit = linked)
+# Furniture (solid): B shelf T table K counter A appliance S sofa/seats D bed G pool table U tub/fountain
+#                    L plant X boxes Q piano F fireplace W wardrobe Y car
+# cat <tabby|sleepy|hunter|blind> x,y x,y ...  walks the waypoints forward, then back
+cat hunter 9,7 22,7
+cat tabby 12,13 21,13
+cat blind 26,5 26,14
+cat sleepy 4,3

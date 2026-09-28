@@ -14,6 +14,7 @@ std::string FormatTime(float seconds)
 bool Game::Init(const std::string& levelPath, float bestTime, bool hasNextLevel)
 {
     if (!level_.LoadFromFile(levelPath)) return false;
+    renderer_.Build(level_);
     bestTime_ = bestTime;
     hasNextLevel_ = hasNextLevel;
     Reset();
@@ -25,6 +26,9 @@ void Game::Reset()
     player_ = Player(level_.PlayerStart());
     trail_.Reset(level_.PlayerStart());
     cheese_ = level_.CheeseSpawns();
+    peppers_ = level_.PepperSpawns();
+    boostTimer_ = 0.0f;
+    flashPhase_ = 0.0f;
     totalCheese_ = static_cast<int>(cheese_.size());
     carried_ = 0;
     stored_ = 0;
@@ -36,7 +40,6 @@ void Game::Reset()
     for (const CatSpawn& spawn : level_.Cats()) cats_.emplace_back(spawn.kind, spawn.route);
     catSeesPlayer_.assign(cats_.size(), false);
 
-    detection_ = 0.0f;
     elapsed_ = 0.0f;
     newBest_ = false;
     popupTimer_ = 0.0f;
@@ -56,6 +59,14 @@ void Game::Update(float dt)
     dt = std::min(dt, 1.0f / 30.0f); // avoid huge jumps if a frame stalls (e.g. dragging the window)
     elapsed_ += dt;
     popupTimer_ -= dt;
+
+    // Red pepper boost: flashes fast when fresh, slower and slower as it runs out.
+    if (boostTimer_ > 0.0f)
+    {
+        const float flashesPerSecond = 1.5f + 6.5f * (boostTimer_ / PepperDuration);
+        flashPhase_ += dt * flashesPerSecond * 2.0f * PI;
+        boostTimer_ = std::max(0.0f, boostTimer_ - dt);
+    }
 
     UpdatePlayer(dt);
     if (state_ == State::Playing) UpdateCats(dt);
@@ -78,7 +89,8 @@ void Game::UpdatePlayer(float dt)
         hiddenIn_ = -1; // step out (ignoreHole_ stops us from instantly re-entering)
     }
 
-    player_.SetSpeedMultiplier(std::max(MinSpeedFactor, 1.0f - SlowdownPerCheese * static_cast<float>(carried_)));
+    const float cheeseFactor = std::max(MinSpeedFactor, 1.0f - SlowdownPerCheese * static_cast<float>(carried_));
+    player_.SetSpeedMultiplier(cheeseFactor * (boostTimer_ > 0.0f ? PepperBoost : 1.0f));
     player_.Update(level_, dt);
     trail_.Record(player_.Position());
 
@@ -88,6 +100,17 @@ void Game::UpdatePlayer(float dt)
         return CheckCollisionCircles(player_.Position(), player_.Radius(), c, CheeseRadius);
     });
     carried_ += static_cast<int>(before - cheese_.size());
+
+    // Red pepper: eat it for a speed boost (a second pepper refills the timer).
+    const size_t peppersBefore = peppers_.size();
+    std::erase_if(peppers_, [&](const Vector2& p) {
+        return CheckCollisionCircles(player_.Position(), player_.Radius(), p, PepperRadius);
+    });
+    if (peppers_.size() != peppersBefore)
+    {
+        boostTimer_ = PepperDuration;
+        flashPhase_ = 0.0f;
+    }
 
     const int tx = static_cast<int>(player_.Position().x) / Level::TileSize;
     const int ty = static_cast<int>(player_.Position().y) / Level::TileSize;
@@ -133,10 +156,32 @@ void Game::StoreCheese(Vector2 where)
     carried_ = 0;
 }
 
+bool Game::IsFlashingRed() const
+{
+    return boostTimer_ > 0.0f && std::sin(flashPhase_) > -0.2f;
+}
+
+namespace
+{
+void DrawPepper(Vector2 c, float t)
+{
+    const float bob = std::sin(t * 3.0f + c.x) * 2.0f;
+    const Color red{220, 40, 35, 255};
+    const Color shine{255, 120, 100, 255};
+    // Curved body made of shrinking circles, a highlight, and a green stem.
+    DrawCircleV({c.x - 5, c.y - 3 + bob}, 8.0f, red);
+    DrawCircleV({c.x + 1, c.y + 2 + bob}, 7.0f, red);
+    DrawCircleV({c.x + 6, c.y + 7 + bob}, 5.0f, red);
+    DrawCircleV({c.x + 10, c.y + 11 + bob}, 3.0f, red);
+    DrawCircleV({c.x - 7, c.y - 5 + bob}, 2.5f, shine);
+    DrawRectangleRounded({c.x - 12, c.y - 13 + bob, 8, 5}, 0.5f, 4, Color{60, 160, 60, 255});
+    DrawLineEx({c.x - 10, c.y - 11 + bob}, {c.x - 14, c.y - 17 + bob}, 3.0f, Color{60, 160, 60, 255});
+}
+} // namespace
+
 void Game::UpdateCats(float dt)
 {
-    // Cats: move, then check whether they can see or touch the player (never while hidden in a hole).
-    float fillRate = 0.0f; // detection gained per second this frame
+    // Cats: move, then check whether they can see or touch the mouse (never while it's hidden in a hole).
     for (size_t i = 0; i < cats_.size(); ++i)
     {
         Cat& cat = cats_[i];
@@ -145,41 +190,31 @@ void Game::UpdateCats(float dt)
         catSeesPlayer_[i] = false;
         if (IsHidden()) continue;
 
-        if (CheckCollisionCircles(player_.Position(), player_.Radius(), cat.Position(), Cat::Radius))
-            detection_ = 1.0f; // bumped right into a cat
+        // Caught by contact. A lunging cat's paws reach a little further; a dazed cat is harmless.
+        const float reach = Cat::Radius + (cat.IsLunging() ? 6.0f : 0.0f);
+        if (!cat.IsStunned() && CheckCollisionCircles(player_.Position(), player_.Radius(), cat.Position(), reach))
+        {
+            state_ = State::Caught;
+            return;
+        }
 
         catSeesPlayer_[i] = cat.CanSee(level_, player_.Position(), player_.Radius());
-        if (catSeesPlayer_[i])
-        {
-            cat.Alert(level_, player_.Position());
-            // The closer the cat, the faster it recognizes you (1x at max range, 3x point-blank).
-            const float dist = Vector2Distance(cat.Position(), player_.Position());
-            const float closeness = 1.0f - std::clamp(dist / cat.ViewRange(), 0.0f, 1.0f);
-            fillRate = std::max(fillRate, cat.DetectMultiplier() * (1.0f + 2.0f * closeness) / DetectTime);
-        }
+        if (catSeesPlayer_[i]) cat.Alert(level_, player_.Position());
     }
-
-    // Detection meter: fills while seen, drains once you break line of sight.
-    if (fillRate > 0.0f)
-        detection_ += fillRate * dt;
-    else
-        detection_ -= dt / (DetectTime * 2.0f);
-    detection_ = std::clamp(detection_, 0.0f, 1.0f);
-
-    if (detection_ >= 1.0f) state_ = State::Caught;
 }
 
 void Game::Draw() const
 {
-    level_.Draw(AllCheeseFound());
+    renderer_.Draw(level_, AllCheeseFound());
 
     for (const Cat& cat : cats_) cat.DrawRoute();
 
     for (const Vector2& c : cheese_)
         DrawPoly(c, 3, CheeseRadius + 2.0f, -90.0f, GOLD);
+    for (const Vector2& p : peppers_) DrawPepper(p, static_cast<float>(GetTime()));
 
     for (size_t i = 0; i < cats_.size(); ++i)
-        cats_[i].Draw(level_, catSeesPlayer_[i] ? detection_ : 0.0f, catSeesPlayer_[i]);
+        cats_[i].Draw(level_, catSeesPlayer_[i]);
     if (debug_)
         for (const Cat& cat : cats_) cat.DrawDebug();
 
@@ -203,7 +238,7 @@ void Game::Draw() const
     }
     else
     {
-        player_.Draw();
+        player_.Draw(IsFlashingRed());
     }
 
     if (popupTimer_ > 0.0f)
@@ -221,6 +256,13 @@ void Game::Draw() const
     DrawText(TextFormat("Stored %d/%d", stored_, totalCheese_), 12, 6, 20, RAYWHITE);
     if (carried_ > 0) DrawText(TextFormat("Carrying %d", carried_), 150, 6, 20, GOLD);
     DrawText(FormatTime(elapsed_).c_str(), 290, 6, 20, LIGHTGRAY);
+    if (boostTimer_ > 0.0f)
+    {
+        // Pepper timer bar under the top bar.
+        DrawRectangle(12, 34, 120, 8, Fade(BLACK, 0.6f));
+        DrawRectangle(12, 34, static_cast<int>(120 * boostTimer_ / PepperDuration), 8, Color{235, 60, 50, 255});
+        DrawText("SPEED!", 140, 30, 16, Color{255, 110, 90, 255});
+    }
 
     const char* hint;
     Color hintColor = LIGHTGRAY;
@@ -244,15 +286,6 @@ void Game::Draw() const
     const char* keys = "R: restart   Esc: menu";
     DrawText(keys, w - MeasureText(keys, 20) - 12, 6, 20, GRAY);
     if (debug_) DrawText("DEBUG (F1)", 12, h - 26, 20, SKYBLUE);
-
-    // Detection bar (only when it's not empty)
-    if (detection_ > 0.0f)
-    {
-        const int barW = 200;
-        const int barX = w / 2 - barW / 2;
-        DrawRectangle(barX, 36, barW, 10, Fade(BLACK, 0.6f));
-        DrawRectangle(barX, 36, static_cast<int>(barW * detection_), 10, ColorLerp(YELLOW, RED, detection_));
-    }
 
     // Level name, fading out over the first two seconds.
     if (state_ == State::Playing && elapsed_ < 2.0f && !level_.Name().empty())

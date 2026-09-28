@@ -1,0 +1,30 @@
+################################
+#.DDDD..SS..BBBBBB........WWWWE#
+#.DDDD...............2.........#
+#.....C........C........C......#
+#1............................L#
+#........X........X............#
+#....X....................X....#
+#............X........X........#
+#..............................#
+#..C......C........C.........C.#
+#...............X..............#
+#......X.................X.....#
+#...................X..........#
+#..........X...................#
+#...X.......................X..#
+#................C.............#
+#P............2...............1#
+################################
+
+name The Nursery
+room nursery
+rug 9,8 12,5 purple
+# Legend: # wall  . floor  P start  C cheese  E exit  R red pepper  1-4 mouse holes (same digit = linked)
+# Furniture (solid): B shelf T table K counter A appliance S sofa/seats D bed G pool table U tub/fountain
+#                    L plant X boxes Q piano F fireplace W wardrobe Y car
+# cat <tabby|sleepy|hunter|blind> x,y x,y ...  walks the waypoints forward, then back
+cat sleepy 11,4
+cat sleepy 23,10
+cat tabby 2,8 29,8
+cat blind 8,15 26,15

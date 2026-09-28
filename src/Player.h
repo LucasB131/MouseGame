@@ -10,7 +10,7 @@ public:
     explicit Player(Vector2 start = {0.0f, 0.0f});
 
     void Update(const Level& level, float dt);
-    void Draw() const;
+    void Draw(bool flashRed = false) const;
 
     Vector2 Position() const { return pos_; }
     void SetPosition(Vector2 pos) { pos_ = pos; }

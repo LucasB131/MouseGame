@@ -1,0 +1,30 @@
+################################
+#P.B...B...B...B..1...........E#
+#..B...B...B...B....XX..XX.....#
+#..B...B...B...B....XX..XX.....#
+#..B.C.B...B.C.B...............#
+#..B...B...B...B......C........#
+#..B...B...B...B............XX.#
+#...........................XX.#
+#....................TTTT......#
+#.............C......TTTT......#
+#.........................C....#
+#..B...B...B...B...............#
+#..B...B...B...B...............#
+#..B.C.B...B...B....XX..XX.....#
+#..B...B...B...B.C..XX..XX.....#
+#..B...B...B...B.............C.#
+#1.B...B...B2..B..............2#
+################################
+
+name The Wine Cellar
+room cellar
+# Legend: # wall  . floor  P start  C cheese  E exit  R red pepper  1-4 mouse holes (same digit = linked)
+# Furniture (solid): B shelf T table K counter A appliance S sofa/seats D bed G pool table U tub/fountain
+#                    L plant X boxes Q piano F fireplace W wardrobe Y car
+# cat <tabby|sleepy|hunter|blind> x,y x,y ...  walks the waypoints forward, then back
+cat blind 2,8 18,8
+cat blind 9,2 9,15
+cat blind 13,11 13,16
+cat tabby 19,11 29,11
+cat blind 27,3 27,14

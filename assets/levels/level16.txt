@@ -1,0 +1,29 @@
+################################
+#1.AAAAAA.....................E#
+#.................C............#
+#..C......2....................#
+#.............................B#
+#.............................B#
+#.......GGGGGG......TTTT......B#
+#.......GGGGGG......TTTT......B#
+#....C..GGGGGG.............C..B#
+#.............................B#
+#..........C........2.........B#
+#.............................B#
+#.....................SS.......#
+#.........SSSSSS...............#
+#........................C.....#
+#................C.............#
+#P........KKKKKK.............1.#
+################################
+
+name The Game Room
+room gameroom
+# Legend: # wall  . floor  P start  C cheese  E exit  R red pepper  1-4 mouse holes (same digit = linked)
+# Furniture (solid): B shelf T table K counter A appliance S sofa/seats D bed G pool table U tub/fountain
+#                    L plant X boxes Q piano F fireplace W wardrobe Y car
+# cat <tabby|sleepy|hunter|blind> x,y x,y ...  walks the waypoints forward, then back
+cat hunter 2,4 27,4
+cat tabby 16,6 16,11
+cat blind 4,12 4,15
+cat tabby 18,14 28,14

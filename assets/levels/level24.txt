@@ -1,0 +1,29 @@
+################################
+#P...K.........KK.........1....#
+#...........C..................#
+#...........................C..#
+#........KK.........KK.........#
+###########################....#
+#.........KK............K......#
+#..C...........................#
+#.....................C......1.#
+#.................KK...........#
+#....###########################
+#.......K............K.........#
+#2..........C...............C..#
+#..............KK..............#
+###########################....#
+#.........L.......L..........2.#
+#.............C...............E#
+################################
+
+name The Portrait Gallery
+room gallery
+# Legend: # wall  . floor  P start  C cheese  E exit  R red pepper  1-4 mouse holes (same digit = linked)
+# Furniture (solid): B shelf T table K counter A appliance S sofa/seats D bed G pool table U tub/fountain
+#                    L plant X boxes Q piano F fireplace W wardrobe Y car
+# cat <tabby|sleepy|hunter|blind> x,y x,y ...  walks the waypoints forward, then back
+cat hunter 2,3 25,3
+cat tabby 6,7 29,7
+cat blind 3,12 25,12
+cat hunter 2,16 26,16

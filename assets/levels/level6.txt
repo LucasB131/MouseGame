@@ -1,0 +1,28 @@
+################################
+#P..........2...............XX.#
+#...B....B....B....B....B...XX.#
+#...B....B....B....B....B......#
+#...B.C..B....B.C..B....B.C....#
+#...B....B....B....B....B......#
+#...B....B....B....B....B......#
+#..............................#
+#............................C.#
+#.....................2........#
+#...B....B....B....B....B......#
+#...B....B....B....B....B......#
+#.C.B....B.C..B....B.C..B......#
+#...B....B....B....B....B......#
+#...B....B....B....B....B...XX.#
+#...........................XX.#
+#1........................1...E#
+################################
+
+name The Pantry
+room pantry
+# Legend: # wall  . floor  P start  C cheese  E exit  R red pepper  1-4 mouse holes (same digit = linked)
+# Furniture (solid): B shelf T table K counter A appliance S sofa/seats D bed G pool table U tub/fountain
+#                    L plant X boxes Q piano F fireplace W wardrobe Y car
+# cat <tabby|sleepy|hunter|blind> x,y x,y ...  walks the waypoints forward, then back
+cat blind 5,8 26,8
+cat blind 17,10 17,14
+cat tabby 6,16 25,16

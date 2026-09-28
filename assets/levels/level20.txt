@@ -1,0 +1,29 @@
+################################
+#1..................KKKKKKKK..E#
+#...YYY...YYY..................#
+#...YYY...YYY............2....B#
+#...YYY.C.YYY.C...............B#
+#...YYY...YYY...........C.....B#
+#...YYY...YYY.................B#
+#.............................B#
+#.............................B#
+#.............................B#
+#..................C..........B#
+#...........................C..#
+#...................XXX........#
+#...................XXX........#
+#...C...............XXX...XX...#
+#...........C....A........XX...#
+#P......2..........1...........#
+################################
+
+name The Garage
+room garage
+# Legend: # wall  . floor  P start  C cheese  E exit  R red pepper  1-4 mouse holes (same digit = linked)
+# Furniture (solid): B shelf T table K counter A appliance S sofa/seats D bed G pool table U tub/fountain
+#                    L plant X boxes Q piano F fireplace W wardrobe Y car
+# cat <tabby|sleepy|hunter|blind> x,y x,y ...  walks the waypoints forward, then back
+cat hunter 2,9 28,9
+cat hunter 16,2 16,14
+cat tabby 5,12 12,12
+cat blind 23,4 28,4

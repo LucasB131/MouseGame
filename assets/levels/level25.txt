@@ -1,0 +1,34 @@
+################################
+#1.........#.QQQQ....#BBBBBBBBE#
+#..C.......#.QQQQ....#.........#
+#............QQQQ....#...C.....#
+#.................C..#.........#
+#..........#.........#.........#
+#F..S......#.........#.........#
+#F..S.TT...#...TT............C.#
+#F..S.TT...#....R..............#
+#F..S......#.........#....TT...#
+#..........#.SSSSSS..#....TT.1.#
+#........C.#.........#.........#
+#..................C.#...SSSS..#
+#....................#.........#
+#..........#...................#
+#..........#..C......#......C..#
+#....P....L#2.......L#2.......L#
+################################
+
+name The Grand Parlor
+room parlor
+rug 3,5 7,6 green
+rug 24,8 6,6 gold
+# Legend: # wall  . floor  P start  C cheese  E exit  R red pepper  1-4 mouse holes (same digit = linked)
+# Furniture (solid): B shelf T table K counter A appliance S sofa/seats D bed G pool table U tub/fountain
+#                    L plant X boxes Q piano F fireplace W wardrobe Y car
+# cat <tabby|sleepy|hunter|blind> x,y x,y ...  walks the waypoints forward, then back
+cat hunter 2,2 9,2
+cat tabby 13,5 19,5
+cat blind 16,12 16,16
+cat hunter 22,5 30,5
+cat tabby 23,15 29,15
+cat sleepy 7,12
+cat blind 24,8

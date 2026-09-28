@@ -1,0 +1,29 @@
+################################
+#UUUU.....KKKKKK....A....1#....#
+#UUUU.....................#....#
+#.........................#..C.#
+#......C..........C.......#....#
+#.........................#....#
+#.........................##.###
+#..............................#
+#P....................C........#
+#...........#.................2#
+#...........#..................#
+#...........#..................#
+#W..............C..............#
+#W..........#..................#
+#W...C......#...........C......#
+#...........#..................#
+#1...A......#2KKKK.......L....E#
+################################
+
+name The Bathroom
+room bathroom
+# Legend: # wall  . floor  P start  C cheese  E exit  R red pepper  1-4 mouse holes (same digit = linked)
+# Furniture (solid): B shelf T table K counter A appliance S sofa/seats D bed G pool table U tub/fountain
+#                    L plant X boxes Q piano F fireplace W wardrobe Y car
+# cat <tabby|sleepy|hunter|blind> x,y x,y ...  walks the waypoints forward, then back
+cat blind 6,6 20,6
+cat tabby 14,10 28,10
+cat blind 8,13 8,15
+cat sleepy 22,12

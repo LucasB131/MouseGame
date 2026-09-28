@@ -1,0 +1,29 @@
+################################
+#1..KKKKKKKKKKKKKKKKKKKKKKKK..1#
+#..............................#
+#..............................#
+#...............C..............#
+#...SSSSSSSSSS....SSSSSSSSSS...#
+#..............................#
+#.......C..............C.......#
+#...SSSSSSSSSS....SSSSSSSSSS...#
+#2.............................#
+#..............................#
+#...SSSSSSSSSS....SSSSSSSSSS...#
+#..............................#
+#.......C..............C.......#
+#...SSSSSSSSSS....SSSSSSSSSS...#
+#..............................#
+#P........C......E...C........2#
+################################
+
+name The Home Theater
+room theater
+# Legend: # wall  . floor  P start  C cheese  E exit  R red pepper  1-4 mouse holes (same digit = linked)
+# Furniture (solid): B shelf T table K counter A appliance S sofa/seats D bed G pool table U tub/fountain
+#                    L plant X boxes Q piano F fireplace W wardrobe Y car
+# cat <tabby|sleepy|hunter|blind> x,y x,y ...  walks the waypoints forward, then back
+cat hunter 15,2 15,15
+cat blind 2,3 2,12
+cat blind 29,3 29,12
+cat tabby 5,3 26,3

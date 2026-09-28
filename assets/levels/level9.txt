@@ -1,0 +1,30 @@
+################################
+#B.BBBBBBBBBB.....L.#1........B#
+#B..................#.........B#
+#B..C...............#.....C...B#
+#B..........C.................B#
+#B............................B#
+#B..................#.........B#
+#......TTTTT........#.........B#
+#......TTTTT........#..TTTT...B#
+#2..............C...#..TTTT....#
+#........S..........#........2.#
+#...C...............#..........#
+#.....................C........#
+#.............SS.S..........C..#
+#.P.................#..........#
+#...................#..........#
+#L.................1#WW..KKKK.E#
+################################
+
+name The Study
+room study
+rug 5,5 9,7 purple
+# Legend: # wall  . floor  P start  C cheese  E exit  R red pepper  1-4 mouse holes (same digit = linked)
+# Furniture (solid): B shelf T table K counter A appliance S sofa/seats D bed G pool table U tub/fountain
+#                    L plant X boxes Q piano F fireplace W wardrobe Y car
+# cat <tabby|sleepy|hunter|blind> x,y x,y ...  walks the waypoints forward, then back
+cat sleepy 11,12
+cat tabby 16,2 16,11
+cat blind 22,4 28,4
+cat blind 5,15 17,15

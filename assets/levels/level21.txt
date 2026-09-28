@@ -1,0 +1,29 @@
+################################
+#P.....1....BBBBBB2........XXX.#
+#.AAA.A....................XXX.#
+#.AAA....C.........C...........#
+#.AAA........................C.#
+#.......#.......#.......#......#
+#..............................#
+#..............................#
+#..........XX.......XX.........#
+#..........XX...C...XX.........#
+#...C...............XX.......C.#
+#..............................#
+#.......#.......#.......#......#
+#..XXX.........................#
+#..XXX....C....................#
+#.................XXXX.C..SSSS.#
+#1.......................2....E#
+################################
+
+name The Basement
+room basement
+# Legend: # wall  . floor  P start  C cheese  E exit  R red pepper  1-4 mouse holes (same digit = linked)
+# Furniture (solid): B shelf T table K counter A appliance S sofa/seats D bed G pool table U tub/fountain
+#                    L plant X boxes Q piano F fireplace W wardrobe Y car
+# cat <tabby|sleepy|hunter|blind> x,y x,y ...  walks the waypoints forward, then back
+cat tabby 2,7 29,7
+cat hunter 2,11 29,11
+cat blind 14,2 14,16
+cat blind 22,13 29,13

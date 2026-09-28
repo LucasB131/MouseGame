@@ -1,0 +1,29 @@
+################################
+#P.......XX..........XXX......1#
+#.XX...C.XX....X..........C.XX.#
+#.XX...........X.C..........XX.#
+#.....#......#.....#.....#.....#
+#...C..........................#
+#.............................W#
+#..........C..........C.......W#
+#..C..........................W#
+#1....#......#.....#.....#.....#
+#..............................#
+#..XX....XX...........XX.......#
+#........XX...........XX.......#
+#.....#..XX..#.....#C....#.....#
+#.........................2.XX.#
+#DDD........C..XXX..S.......XX.#
+#DDD....2.....................E#
+################################
+
+name The Attic
+room attic
+# Legend: # wall  . floor  P start  C cheese  E exit  R red pepper  1-4 mouse holes (same digit = linked)
+# Furniture (solid): B shelf T table K counter A appliance S sofa/seats D bed G pool table U tub/fountain
+#                    L plant X boxes Q piano F fireplace W wardrobe Y car
+# cat <tabby|sleepy|hunter|blind> x,y x,y ...  walks the waypoints forward, then back
+cat hunter 1,6 29,6
+cat hunter 5,16 27,16
+cat tabby 13,10 13,12
+cat blind 16,10 28,10

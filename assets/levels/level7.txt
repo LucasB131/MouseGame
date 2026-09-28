@@ -1,0 +1,30 @@
+################################
+#P.........2..FFFF............1#
+#..............................#
+#..BBBBBBBB..........BBBBBBBB..#
+#.....C........................#
+#............S....S......C.....#
+#..BBBBBBBB..........BBBBBBBB..#
+#.............TTTT.............#
+#.............TTTT.............#
+#C............................C#
+#..............................#
+#..BBBBBBBB.....C....BBBBBBBB..#
+#.....C........................#
+#.........................C....#
+#..BBBBBBBB..........BBBBBBBB..#
+#..............................#
+#1.............E....2..........#
+################################
+
+name The Library
+room library
+rug 12,4 8,9 green
+# Legend: # wall  . floor  P start  C cheese  E exit  R red pepper  1-4 mouse holes (same digit = linked)
+# Furniture (solid): B shelf T table K counter A appliance S sofa/seats D bed G pool table U tub/fountain
+#                    L plant X boxes Q piano F fireplace W wardrobe Y car
+# cat <tabby|sleepy|hunter|blind> x,y x,y ...  walks the waypoints forward, then back
+cat tabby 2,10 29,10
+cat blind 11,3 11,14
+cat blind 20,3 20,14
+cat sleepy 16,13

@@ -1,0 +1,29 @@
+################################
+#L................L........1...#
+#.P............C.............K.#
+#....GGGGGG..................K.#
+#....GGGGGG...........C......K.#
+#....GGGGGG..................K.#
+#............................K.#
+#..................GGGGGG....K.#
+#1......C...C......GGGGGG....K.#
+#...............R..GGGGGG....K.#
+#..............................#
+#....GGGGGG...................E#
+#....GGGGGG...........C..TT....#
+#....GGGGGG..............TT....#
+#............................C.#
+#.C...........SSSSS...........2#
+#................2............L#
+################################
+
+name The Billiards Room
+room billiards
+rug 17,5 10,7 green
+# Legend: # wall  . floor  P start  C cheese  E exit  R red pepper  1-4 mouse holes (same digit = linked)
+# Furniture (solid): B shelf T table K counter A appliance S sofa/seats D bed G pool table U tub/fountain
+#                    L plant X boxes Q piano F fireplace W wardrobe Y car
+# cat <tabby|sleepy|hunter|blind> x,y x,y ...  walks the waypoints forward, then back
+cat hunter 13,2 13,14
+cat tabby 27,2 27,15
+cat blind 3,8 11,8
