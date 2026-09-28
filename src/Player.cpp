@@ -7,6 +7,12 @@
 
 Player::Player(Vector2 start) : pos_(start) {}
 
+bool Player::MovementKeyDown()
+{
+    return IsKeyDown(KEY_W) || IsKeyDown(KEY_UP) || IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN) ||
+           IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT);
+}
+
 void Player::Update(const Level& level, float dt)
 {
     Vector2 dir{0.0f, 0.0f};
@@ -19,7 +25,7 @@ void Player::Update(const Level& level, float dt)
 
     dir = Vector2Normalize(dir);
     facing_ = dir;
-    const Vector2 delta = Vector2Scale(dir, speed_ * dt);
+    const Vector2 delta = Vector2Scale(dir, speed_ * speedMultiplier_ * dt);
 
     // Move one axis at a time so the player slides along walls instead of sticking.
     pos_.x += delta.x;

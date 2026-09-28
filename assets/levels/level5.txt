@@ -1,0 +1,30 @@
+################################
+#P.1#..........#1..............#
+#...#..C.......#.......C.......#
+#...#...####...#...#######.....#
+#...........#..........#.......#
+#...#...#...#..#.......#...C...#
+##.##...#...####...#...#.......#
+#.......#..........#...#####.###
+#...C...#...####...#..........3#
+#.......#...#.2........#####...#
+####.####...#..C...#.......#...#
+#...........#......#......3#...#
+#...######..####.###...C...#...#
+#...#..........................#
+#...#..C...#######...#######...#
+#...#..........#...............#
+#2......................#.....E#
+################################
+
+name The Cat House
+# Cat syntax: cat <tabby|sleepy|hunter> x,y x,y ...  (tile coordinates, type defaults to tabby)
+# Each cat walks its waypoints forward, then back. Consecutive waypoints need a clear straight path.
+# A cat with a single waypoint stands in place (sleepy cats nap; others slowly turn).
+# Mouse holes are the digits 1-4 in the grid; two holes with the same digit are linked.
+cat hunter 1,11 11,11
+cat tabby 5,13 29,13
+cat tabby 13,4 22,4
+cat sleepy 24,10
+cat sleepy 27,4
+cat tabby 16,15 29,15

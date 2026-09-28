@@ -1,8 +1,6 @@
 // MouseGame - top-down stealth game (working title)
 
-#include <string>
-
-#include "Game.h"
+#include "App.h"
 #include "raylib.h"
 
 int main()
@@ -12,24 +10,17 @@ int main()
 
     SetConfigFlags(FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT);
     InitWindow(screenWidth, screenHeight, "MouseGame");
+    SetExitKey(KEY_NULL); // Esc is handled by the game (back to menu / quit from menu)
     SetTargetFPS(60);
 
-    // Assets are copied next to the .exe by CMake, so load relative to the executable.
-    const std::string levelPath = std::string(GetApplicationDirectory()) + "assets/levels/level1.txt";
+    App app;
+    app.Init();
 
-    Game game;
-    const bool loaded = game.Init(levelPath);
-
-    while (!WindowShouldClose())
+    while (!WindowShouldClose() && app.Update())
     {
-        if (loaded) game.Update(GetFrameTime());
-
         BeginDrawing();
         ClearBackground(BLACK);
-        if (loaded)
-            game.Draw();
-        else
-            DrawText(TextFormat("Could not load level:\n%s", levelPath.c_str()), 20, 20, 20, RED);
+        app.Draw();
         EndDrawing();
     }
 
