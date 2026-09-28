@@ -22,12 +22,33 @@ raylib is downloaded automatically by CMake on the first configure.
 | Key | Action |
 |-----|--------|
 | WASD / Arrows | Move |
+| R | Restart level |
 | Esc | Quit |
+
+## Level format
+
+Levels live in `assets/levels/` as plain text, one character per 40x40 tile:
+
+| Char | Meaning |
+|------|---------|
+| `#` | Wall |
+| `.` | Floor |
+| `P` | Player start |
+| `C` | Cheese |
+| `E` | Exit (opens once all cheese is collected) |
+
+## Code layout
+
+- `src/Level.*`: loads and draws the tile grid
+- `src/Player.*`: movement and circle-vs-tile collision
+- `src/Game.*`: game state, cheese, win condition, HUD
+- `src/main.cpp`: window setup and main loop
 
 ## Roadmap
 
 - [x] Window, player movement, collectible
-- [ ] Tile-based levels and walls
+- [x] Tile-based levels loaded from text files, wall collision
+- [x] Cheese collection, locked exit, level-complete screen
 - [ ] Cat enemies with patrol routes and vision cones
 - [ ] Detection, chase, and fail state
 - [ ] Level exit, scoring, multiple levels
