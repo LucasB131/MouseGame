@@ -43,10 +43,11 @@ public:
     float AimLockTime() const { return BossAimLock - 0.05f * static_cast<float>(hits_); }
     float BodyRadius() const { return stats_->radius; }
     const char* Name() const { return stats_->name; }
+    CatKind Kind() const { return kind_; }
     bool IsAsleep() const { return asleep_; }
     Vector2 Position() const { return pos_; }
 
-    void Draw(const Level& level, bool seesPlayer) const;
+    void Draw(const Level& level, bool seesPlayer, int variant = 0) const; // variant: shop costume
     void DrawRoute() const; // dotted white line along the patrol route
     void DrawDebug() const; // current A* path, last known mouse position
 

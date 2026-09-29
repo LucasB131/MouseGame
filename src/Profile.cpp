@@ -3,32 +3,49 @@
 #include <algorithm>
 #include <fstream>
 
+void Profile::Reset()
+{
+    coins_ = 0;
+    owned_ = 0;
+    for (int c = 0; c < SkinCategoryCount; ++c)
+    {
+        equipped_[c] = DefaultSkinId(static_cast<SkinCategory>(c));
+        owned_ |= 1ull << equipped_[c]; // the default of every category is always owned
+    }
+}
+
 void Profile::Load(const std::string& path)
 {
     path_ = path;
-    coins_ = 0;
-    owned_ = 1u;
-    equipped_ = MouseSkin::Classic;
+    Reset();
 
-    // Format: "coins N", "owned <bitmask>", "equipped <skin index>"
+    // Format: "coins N", "owned <bitmask>", "equip0".."equip4 <skin id>" (older files: "equipped <mouse skin id>").
     std::ifstream in(path);
     std::string key;
-    int value = 0;
+    long long value = 0;
     while (in >> key >> value)
     {
-        if (key == "coins") coins_ = std::max(0, value);
-        else if (key == "owned") owned_ = static_cast<unsigned>(value) & ((1u << MouseSkinCount) - 1u);
-        else if (key == "equipped" && value >= 0 && value < MouseSkinCount) equipped_ = static_cast<MouseSkin>(value);
+        if (key == "coins") coins_ = static_cast<int>(std::max(0ll, value));
+        else if (key == "owned") owned_ |= static_cast<std::uint64_t>(value) & ((1ull << SkinCount) - 1ull);
+        else if (key == "equipped") equipped_[0] = static_cast<int>(value); // legacy: mouse skin
+        else if (key.size() == 6 && key.compare(0, 5, "equip") == 0 && key[5] >= '0' && key[5] < '0' + SkinCategoryCount)
+            equipped_[key[5] - '0'] = static_cast<int>(value);
     }
-    owned_ |= 1u;
-    if (!Owns(equipped_)) equipped_ = MouseSkin::Classic;
+    // Never wear something that isn't owned or belongs to another category.
+    for (int c = 0; c < SkinCategoryCount; ++c)
+    {
+        const int id = equipped_[c];
+        if (id < 0 || id >= SkinCount || !Owns(id) || GetSkinInfo(id).category != static_cast<SkinCategory>(c))
+            equipped_[c] = DefaultSkinId(static_cast<SkinCategory>(c));
+    }
 }
 
 void Profile::Save() const
 {
     if (path_.empty()) return;
     std::ofstream out(path_);
-    out << "coins " << coins_ << '\n' << "owned " << owned_ << '\n' << "equipped " << static_cast<int>(equipped_) << '\n';
+    out << "coins " << coins_ << '\n' << "owned " << owned_ << '\n';
+    for (int c = 0; c < SkinCategoryCount; ++c) out << "equip" << c << ' ' << equipped_[c] << '\n';
 }
 
 void Profile::AddCoins(int amount)
@@ -36,18 +53,19 @@ void Profile::AddCoins(int amount)
     coins_ = std::max(0, coins_ + amount);
 }
 
-bool Profile::Buy(MouseSkin skin)
+bool Profile::Buy(int skinId)
 {
-    const int price = GetSkinInfo(skin).price;
-    if (Owns(skin) || coins_ < price) return false;
+    if (skinId < 0 || skinId >= SkinCount) return false;
+    const int price = GetSkinInfo(skinId).price;
+    if (Owns(skinId) || coins_ < price) return false;
     coins_ -= price;
-    owned_ |= 1u << static_cast<int>(skin);
+    owned_ |= 1ull << skinId;
     return true;
 }
 
-bool Profile::Equip(MouseSkin skin)
+bool Profile::Equip(int skinId)
 {
-    if (!Owns(skin)) return false;
-    equipped_ = skin;
+    if (skinId < 0 || skinId >= SkinCount || !Owns(skinId)) return false;
+    equipped_[static_cast<int>(GetSkinInfo(skinId).category)] = skinId;
     return true;
 }

@@ -19,6 +19,7 @@ bool IsFurnitureChar(char c)
     {
     case 'B': case 'T': case 'K': case 'A': case 'S': case 'D': case 'G': case 'U':
     case 'L': case 'X': case 'Q': case 'F': case 'W': case 'Y':
+    case 'N': case 'M': case 'V':
         return true;
     default:
         return false;
@@ -162,7 +163,8 @@ void Level::ParseRug(const std::string& line)
     static const std::pair<const char*, Color> colors[] = {
         {"red", {130, 40, 44, 255}}, {"blue", {50, 70, 120, 255}}, {"green", {50, 96, 64, 255}},
         {"gold", {150, 112, 50, 255}}, {"purple", {90, 56, 110, 255}}, {"teal", {40, 104, 104, 255}},
-        {"cream", {170, 150, 120, 255}},
+        {"cream", {170, 150, 120, 255}}, {"lapis", {40, 64, 124, 255}}, {"sand", {190, 160, 108, 255}},
+        {"onyx", {44, 42, 52, 255}},
     };
     rug.color = colors[0].second;
     for (const auto& [name, c] : colors)

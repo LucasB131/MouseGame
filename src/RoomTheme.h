@@ -9,10 +9,12 @@ enum class RoomTheme
 {
     Foyer, Living, Dining, Hallway, Kitchen, Pantry, Library, Billiards, Study, Music,
     Conservatory, Laundry, Bathroom, Bedroom, Nursery, GameRoom, Theater, Cellar, Garage,
-    Basement, Attic, Ballroom, Gallery, Parlor
+    Basement, Attic, Ballroom, Gallery, Parlor,
+    // World 2 - Egypt wing (keep these last: IsEgypt() relies on the order)
+    Pyramid, GreatGallery, ColumnHall, Tomb, Vault
 };
 
-enum class FloorStyle { Wood, Checker, Tile, Carpet, Concrete, Marble };
+enum class FloorStyle { Wood, Checker, Tile, Carpet, Concrete, Marble, Flagstone, Basalt };
 
 struct ThemeStyle
 {
@@ -23,7 +25,10 @@ struct ThemeStyle
     Color wallTop;    // wall highlight
     Color accent;     // sofas, beds, cushions
     Color wood;       // tables, shelves, frames
+    bool stone = false; // carved stone walls with a hieroglyph frieze (Egypt rooms)
 };
+
+inline bool IsEgyptTheme(RoomTheme t) { return t >= RoomTheme::Pyramid; }
 
 const ThemeStyle& GetThemeStyle(RoomTheme theme);
 bool ParseRoomTheme(const std::string& text, RoomTheme& out);

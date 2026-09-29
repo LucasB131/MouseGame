@@ -27,6 +27,7 @@ struct CatLook
     Vector2 pos{};
     Vector2 facing{1.0f, 0.0f};
     CatKind kind = CatKind::Tabby;
+    int variant = 0;     // costume/coat from the shop (0 = default); see Skins.cpp
     CatPose pose = CatPose::Normal;
     float walkPhase = 0.0f;
     bool moving = false;

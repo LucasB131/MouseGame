@@ -26,6 +26,8 @@ public:
 
     bool IsWon() const { return state_ == State::Won; }
     void SetMouseSkin(MouseSkin skin) { skin_ = skin; }
+    // Which shop costume every cat of a type wears (0 = default).
+    void SetCatVariant(CatKind kind, int variant) { catVariant_[static_cast<int>(kind)] = variant; }
     // Coins for this win: the cheese you got home, plus a bonus the first time the level is cleared.
     int CoinsEarned() const { return storedCoins_ + (firstClear_ ? (bossIndex_ >= 0 ? BossClearBonus : ClearBonus) : 0); }
     float BestTime() const { return bestTime_; }
@@ -81,6 +83,7 @@ private:
     int storedCoins_ = 0;      // shop coins those pieces are worth (Gouda 2, Golden Cheese 25)
     bool firstClear_ = false;  // this win is the level's first clear
     MouseSkin skin_ = MouseSkin::Classic;
+    int catVariant_[CatKindCount] = {};
 
     int hiddenIn_ = -1;   // index of the hole the mouse is hiding in, -1 if out in the open
     int ignoreHole_ = -1; // hole just left; can't re-enter until you step off it

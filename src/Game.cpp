@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "Sprites.h"
+#include "Viewport.h"
 #include "raymath.h"
 
 std::string FormatTime(float seconds)
@@ -237,9 +238,9 @@ void Game::DrawBossHud() const
 {
     if (bossIndex_ < 0) return;
     const Cat& boss = cats_[bossIndex_];
-    const int w = GetScreenWidth();
+    const int w = LogicalWidth;
     // Name plate and three "health" paws that break as he crashes.
-    const Rectangle plate{w / 2.0f - 150, static_cast<float>(GetScreenHeight()) - 37.0f, 300, 34}; // below the map, clear of the throne
+    const Rectangle plate{w / 2.0f - 150, static_cast<float>(LogicalHeight) - 37.0f, 300, 34}; // below the map, clear of the throne
     DrawRectangleRounded(plate, 0.4f, 8, Fade(BLACK, 0.6f));
     DrawText("SIR POUNCE", static_cast<int>(plate.x + 14), static_cast<int>(plate.y + 8), 20, Color{255, 150, 130, 255});
     for (int i = 0; i < Cat::BossHitsToWin; ++i)
@@ -303,7 +304,7 @@ void Game::Draw() const
     for (const Vector2& p : peppers_) DrawPepper(p, static_cast<float>(GetTime()));
 
     for (size_t i = 0; i < cats_.size(); ++i)
-        cats_[i].Draw(level_, catSeesPlayer_[i]);
+        cats_[i].Draw(level_, catSeesPlayer_[i], catVariant_[static_cast<int>(cats_[i].Kind())]);
     if (debug_)
         for (const Cat& cat : cats_) cat.DrawDebug();
 
@@ -342,8 +343,8 @@ void Game::Draw() const
     }
 
     // HUD
-    const int w = GetScreenWidth();
-    const int h = GetScreenHeight();
+    const int w = LogicalWidth;
+    const int h = LogicalHeight;
     DrawRectangle(0, 0, w, 30, Fade(BLACK, 0.55f));
     DrawText(TextFormat("Stored %d/%d", stored_, totalCheese_), 12, 6, 20, RAYWHITE);
     if (carried_ > 0) DrawText(TextFormat("Carrying %d", carried_), 150, 6, 20, GOLD);

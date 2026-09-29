@@ -10,7 +10,14 @@ Sneak a mouse past patrolling cats, carry the cheese home, and reach the exit wi
 ![Level select](docs/levels.png)
 ![The secret boss slot](docs/boss_slot.png)
 ![Sir Pounce, the World 1 boss](docs/boss_fight.png)
-![The shop](docs/shop.png)
+![The shop: mouse skins](docs/shop.png)
+![Cat skins in the shop](docs/shop_cats.png)
+![Every mouse skin](docs/skins_mice.png)
+![World 2 unlocked on the world select](docs/world2_worlds.png)
+![World 2: Hall of Columns](docs/world2_room3.png)
+![World 2: Pharaoh's Burial Chamber](docs/world2_room4.png)
+![World 2: Treasure Vault](docs/world2_room5.png)
+![Every cat skin](docs/skins_cats.png)
 
 ## Features
 
@@ -30,11 +37,19 @@ Sneak a mouse past patrolling cats, carry the cheese home, and reach the exit wi
 - **Secret boss**: clear all 25 levels and a `?` door on the level select opens to **Sir Pounce's Throne Room**.
   Sir Pounce is a huge tuxedo cat with a crown who pounces from far away. A red lane shows where he will leap, and
   it locks in a moment before he does. Trick him into crashing into a pillar or table **3 times** to knock him out,
-  grab the **Golden Cheese** he drops, and escape through the exit. Beating him unlocks World 2 (not built yet)
+  grab the **Golden Cheese** he drops, and escape through the exit. Beating him unlocks World 2
+- **World 2: Through History** (first 5 of 25 rooms built): the Egypt wing. Pyramid Entrance, The Grand Gallery, Hall of Columns,
+  Pharaoh's Burial Chamber and the Treasure Vault, with sandstone and basalt floors, carved hieroglyph walls, columns,
+  jackal statues and sphinxes, sarcophagi, braziers, reflecting pools and treasure. It has its own save file
 - **Shop and coins**: cheese you bring home earns coins (Gouda is worth 2, the Golden Cheese 25), plus a bonus the
-  first time you clear a level (10, or 50 for the boss). Spend them in the shop (press **S** on the world select).
-  The first skin is the **Ace Aviator** mouse: slate-blue coat, leather cap, brass goggles and a red scarf that
-  streams behind. Coins, owned skins and the equipped skin are saved in `profile.txt`
+  first time you clear a level (10, or 50 for the boss). Spend them in the shop (press **S** on the world select),
+  which has a tab for the mouse and one for each cat type
+- **Skins**: seven mouse skins (Classic, Ace Aviator, Buccaneer, Chef Mouse, Wee Wizard, Shadow Ninja, Golden Mouse)
+  and three looks per cat type (a free default plus a recolor and a costume: Midnight and Dapper Tabby, Cream Puff and
+  Nightcap Sleepy cats, Chocolate Point and Ninja Hunters, Snowy and Cool Shades Blind cats). A cat skin dresses every
+  cat of that type. Coins, owned skins and what you're wearing are saved in `profile.txt`
+- **Fullscreen**: press **F11** (or Alt+Enter). The game keeps its 16:9 layout and scales to any window size
+  with black bars; the window is also resizable
 - **Lunges**: a cat that gets close crouches for a split second, then pounces. A hit catches you. A miss means it
   keeps chasing if it can still see you, or gives up and searches. Pouncing into a wall leaves it dazed with spinning
   stars, unable to see or move
@@ -74,6 +89,8 @@ raylib is downloaded automatically by CMake on the first configure.
 | Space | Skip intro / in a mouse hole: travel to the matching hole |
 | Enter or click | Choose a world or level / next level after winning / buy or equip in the shop |
 | S | Open the shop (on the world select) |
+| Tab or Q / E | Shop: switch category |
+| F11 or Alt+Enter | Toggle fullscreen |
 | R | Restart level |
 | Esc | Back (level -> level select -> world select -> quit) |
 | F1 | Debug view: A* paths, lunge range, last known position |
@@ -130,6 +147,12 @@ Furniture letters (all solid): `B` shelf, `T` table, `K` counter/cabinet, `A` ap
 Rectangles of the same letter are drawn as one piece, and the art adapts to the room: a `B` shelf holds books in the
 library, jars in the pantry and wine bottles in the cellar.
 
+World 2 adds `N` column, `M` statue (a jackal guardian on its own, a sphinx when it is 2+ tiles) and `V` treasure, and
+re-skins the house letters in its Egypt rooms: `B` stele, `T` altar, `D` sarcophagus, `L` palm, `X` urns and blocks,
+`F` brazier, `U` reflecting pool, `S` stone bench. Its rooms are `assets/levels/w2_level1.txt`, `w2_level2.txt`, and so on.
+Room themes for `room <name>`: `pyramid`, `greatgallery`, `columnhall`, `tomb`, `vault`. Rug colors also include
+`lapis`, `sand` and `onyx`.
+
 After the grid, leave a blank line, then:
 
 ```
@@ -156,6 +179,7 @@ dodges gets caught.
 ## Code layout
 
 - `src/main.cpp`: window setup and main loop
+- `src/Viewport.*`: fixed 1280x720 logical screen scaled to any window size, mouse mapping, F11 fullscreen
 - `src/App.*`: intro, world select, level select, shop, screen flow, saving best times
 - `src/Game.*`: one level in play: cheese carrying/storing, mouse holes, catching, timer, win/lose, HUD
 - `src/Level.*`: loads the tile grid, furniture, rugs and room theme; raycasting / line of sight / wall overlap
@@ -164,8 +188,8 @@ dodges gets caught.
 - `src/Player.*`: movement and circle-vs-tile collision
 - `src/Sprites.*`: code-drawn mouse, cat and cheese art (shared by the game and the menus)
 - `src/Cheese.*`: cheese kinds, their weights and coin values
-- `src/Skins.*`: the skin catalog (names, descriptions, prices)
-- `src/Profile.*`: coins, owned skins and the equipped skin, saved to `profile.txt`
+- `src/Skins.*`: the skin catalog (categories, names, descriptions, prices)
+- `src/Profile.*`: coins, owned skins and the skin worn in each category, saved to `profile.txt`
 - `src/CheeseTrail.*`: position history that carried cheese follows
 - `src/Cat.*`: cat behavior state machine, lunging, stuns, napping, vision drawing
 - `src/CatTypes.*`: stats for each cat type
@@ -181,10 +205,12 @@ dodges gets caught.
 - [x] Intro, world select, 25-slot level select, 10 levels, sequential unlocking
 - [x] Red pepper speed boost
 - [x] World 1 secret boss (Sir Pounce) that unlocks World 2
-- [x] Shop with coins and a first mouse skin
-- [ ] More skins (mouse and cat) and a shop tab for each
+- [x] Shop with coins, mouse skins and cat skins (a tab for each)
+- [x] Fullscreen (F11)
 - [ ] Lives and respawning at the last mouse hole
 - [x] Detailed character art and five cheese types
 - [ ] Sound effects and music
 - [x] World 1: 25 themed house rooms with furniture
-- [ ] World 2 (The Garden) and Worlds 3-5
+- [x] World 2: first 5 rooms (Egypt wing)
+- [ ] World 2: the other 20 rooms (Greece and Rome, medieval castle, Asia with the Taj Mahal, Versailles, a futuristic lab)
+- [ ] Worlds 3-5

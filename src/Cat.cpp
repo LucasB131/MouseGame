@@ -339,7 +339,7 @@ bool Cat::CanSee(const Level& level, Vector2 point, float r) const
     return level.HasLineOfSight(pos_, point);
 }
 
-void Cat::Draw(const Level& level, bool seesPlayer) const
+void Cat::Draw(const Level& level, bool seesPlayer, int variant) const
 {
     const float range = stats_->viewRange;
     const float half = stats_->viewHalfAngle;
@@ -395,6 +395,7 @@ void Cat::Draw(const Level& level, bool seesPlayer) const
     look.pos = pos_;
     look.facing = f;
     look.kind = kind_;
+    look.variant = variant;
     look.walkPhase = walkPhase_;
     look.moving = moving_;
     look.alert = seesPlayer || behavior_ == Behavior::Investigate;

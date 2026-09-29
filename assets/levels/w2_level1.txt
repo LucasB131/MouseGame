@@ -1,0 +1,30 @@
+################################
+#L..BBBBBB...F.E..F...BBBBBB..L#
+#..............................#
+#..C..........TTTT..........C..#
+#..............................#
+#1.............................#
+#..............................#
+############M......M############
+#L2...........................L#
+#....C.....................C..1#
+#...UUUU.....M....M.....UUUU...#
+#...UUUU.......C........UUUU...#
+#...UUUU................UUUU...#
+#............M....M............#
+#..............................#
+#.P......C.....R.......C.......#
+#L...........................2L#
+################################
+
+name Pyramid Entrance
+room pyramid
+rug 13,8 6,9 lapis
+# Legend: # wall  . floor  P start  C cheese  O gouda wheel (heavy)  E exit  R red pepper  1-4 mouse holes (same digit = linked)
+# Furniture (solid): B shelf T table K counter A appliance S sofa/seats D bed G pool table U tub/fountain
+#                    L plant X boxes Q piano F fireplace W wardrobe Y car
+#                    N column M statue V treasure (World 2: B stele, T altar, D sarcophagus, F brazier, U pool, X urns)
+# cat <tabby|sleepy|hunter|blind> x,y x,y ...  walks the waypoints forward, then back
+cat tabby 3,5 28,5
+cat tabby 3,14 28,14
+cat sleepy 9,9

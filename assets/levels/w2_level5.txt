@@ -1,0 +1,32 @@
+################################
+#M.VVVV.2.....................M#
+#..............................#
+#.C.............C............C.#
+#....N.........................#
+#1.......##############........#
+#........#.VVV.FF.VVV.#........#
+#.....C.F#.....E......#........#
+#.............TTTT.........C...#
+#..........O..TTTT.............#
+#........#..........O.#F.......#
+#........#.VVV....VVV.#........#
+#........##############.......1#
+#.........................N....#
+#...C........................C.#
+#..............C...............#
+#MP....................2.VVVV.M#
+################################
+
+name Treasure Vault
+room vault
+rug 10,7 12,4 onyx
+# Legend: # wall  . floor  P start  C cheese  O gouda wheel (heavy)  E exit  R red pepper  1-4 mouse holes (same digit = linked)
+# Furniture (solid): B shelf T table K counter A appliance S sofa/seats D bed G pool table U tub/fountain
+#                    L plant X boxes Q piano F fireplace W wardrobe Y car
+#                    N column M statue V treasure (World 2: B stele, T altar, D sarcophagus, F brazier, U pool, X urns)
+# cat <tabby|sleepy|hunter|blind> x,y x,y ...  walks the waypoints forward, then back
+cat hunter 4,2 4,16
+cat tabby 10,14 29,14
+cat tabby 10,3 29,3
+cat hunter 10,7 21,7
+cat blind 24,6 24,11

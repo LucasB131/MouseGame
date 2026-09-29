@@ -51,22 +51,37 @@ private:
     bool IsUnlocked(int index) const; // level n+1 opens once level n is beaten; the boss once all 25 are
     bool HasBoss() const { return static_cast<int>(levels_.size()) > BossSlot; }
     bool BossBeaten() const { return HasBoss() && levels_[BossSlot].bestTime >= 0.0f; }
-    bool WorldUnlocked(int world) const { return world == 0 || (world == 1 && BossBeaten()); }
+    bool WorldUnlocked(int world) const { return world == 0 || (world == 1 && summary_[0].bossBeaten); }
+    void LoadWorld(int world);  // fills levels_ + savePath_ for that world
+    void RefreshSummary();      // updates summary_ for the active world
     Rectangle BossSlotRect() const;
     void DrawBossSlot() const;
     Rectangle WorldCardRect(int index) const;
     Rectangle LevelSlotRect(int index) const;
     Rectangle ShopButtonRect() const;
     Rectangle ShopCardRect(int index) const;
+    Rectangle ShopTabRect(int index) const;
     void ActivateShopCard(int index);
+    SkinCategory ShopCategory() const { return static_cast<SkinCategory>(shopTab_); }
 
     void LoadSave();
     void WriteSave() const;
 
-    std::vector<LevelEntry> levels_; // World 1's playable levels
+    // What the world-select cards show, kept for every world so they don't depend on which one is loaded.
+    struct WorldSummary
+    {
+        int cleared = 0;
+        int playable = 0;
+        bool bossBeaten = false;
+    };
+
+    std::vector<LevelEntry> levels_; // the playable levels of the active world
+    WorldSummary summary_[WorldCount];
+    int activeWorld_ = 0;
     std::string savePath_;
     Profile profile_;
-    int shopSel_ = 0;
+    int shopSel_ = 0; // selected card within the current tab
+    int shopTab_ = 0; // SkinCategory shown in the shop
     std::string shopToast_;
     float shopToastTimer_ = 0.0f;
     bool shopToastGood_ = true;

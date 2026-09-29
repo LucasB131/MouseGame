@@ -188,6 +188,33 @@ void DrawFloorTile(const ThemeStyle& st, int x, int y)
         if (Hash(x, y, 99) % 17 == 0)
             DrawLineEx({px + 5, py + 8}, {px + 30, py + 26}, 1.0f, Shade(st.floorB, 0.75f)); // crack
         break;
+    case FloorStyle::Flagstone:
+    {
+        // Two staggered courses of sandstone blocks per tile.
+        for (int k = 0; k < 2; ++k)
+        {
+            const int y0 = static_cast<int>(py) + k * 20;
+            const float t = Rand01(x, y * 2 + k, 15);
+            DrawRectangle(static_cast<int>(px), y0, TS, 20, Mix(st.floorA, st.floorB, t * 0.7f));
+            DrawLine(static_cast<int>(px), y0 + 19, static_cast<int>(px + TS), y0 + 19, Shade(st.floorB, 0.78f));
+            const int seam = static_cast<int>(px) + (((x + y * 2 + k) % 2) ? 6 : 26);
+            DrawLine(seam, y0, seam, y0 + 19, Shade(st.floorB, 0.78f));
+            if (Hash(x, y * 2 + k, 16) % 5 == 0)
+                DrawRectangle(static_cast<int>(px) + 4 + static_cast<int>(Hash(x, y, 17) % 30), y0 + 4 + static_cast<int>(Hash(x, y, 18) % 10), 2, 2, Shade(st.floorB, 0.85f));
+        }
+        break;
+    }
+    case FloorStyle::Basalt:
+    {
+        // Big dark slabs with a faint sheen and pale flecks.
+        const bool alt = ((x / 2 + y / 2) % 2) == 0;
+        DrawRectangle(static_cast<int>(px), static_cast<int>(py), TS, TS, alt ? st.floorA : st.floorB);
+        if (x % 2 == 0) DrawLine(static_cast<int>(px), static_cast<int>(py), static_cast<int>(px), static_cast<int>(py + TS), Fade(BLACK, 0.25f));
+        if (y % 2 == 0) DrawLine(static_cast<int>(px), static_cast<int>(py), static_cast<int>(px + TS), static_cast<int>(py), Fade(BLACK, 0.25f));
+        for (int i = 0; i < 4; ++i)
+            DrawRectangle(static_cast<int>(px) + static_cast<int>(Hash(x, y, 120 + i) % TS), static_cast<int>(py) + static_cast<int>(Hash(x, y, 130 + i) % TS), 2, 2, Fade(WHITE, 0.12f));
+        break;
+    }
     case FloorStyle::Marble:
     {
         // Big 2x2-tile slabs with faint veins.
@@ -928,13 +955,356 @@ void DrawCar(const Piece& p)
     }
 }
 
+// ------------------------------------------------------------------ Egypt wing (World 2)
+
+const Color kSand{198, 170, 120, 255};
+const Color kSandDark{150, 124, 84, 255};
+const Color kGold{232, 192, 72, 255};
+const Color kGoldDark{170, 128, 40, 255};
+const Color kLapis{40, 72, 152, 255};
+const Color kTurquoise{54, 168, 164, 255};
+const Color kOnyx{38, 36, 46, 255};
+
+void Ellipse(Vector2 c, float along, float across, bool horiz, Color col)
+{
+    if (horiz) DrawEllipse(static_cast<int>(c.x), static_cast<int>(c.y), along, across, col);
+    else DrawEllipse(static_cast<int>(c.x), static_cast<int>(c.y), across, along, col);
+}
+
+// Tiny carved hieroglyphs: eye, ankh, water, bird, sun, scarab.
+void DrawGlyph(float cx, float cy, int kind, Color c)
+{
+    switch (kind % 6)
+    {
+    case 0: // eye of Horus
+        DrawEllipseLines(static_cast<int>(cx), static_cast<int>(cy), 7, 4, c);
+        DrawCircleV({cx, cy}, 2.2f, c);
+        DrawLineEx({cx - 2, cy + 4}, {cx - 4, cy + 9}, 1.5f, c);
+        break;
+    case 1: // ankh
+        DrawRing({cx, cy - 4}, 2.5f, 4.5f, 0, 360, 16, c);
+        DrawLineEx({cx, cy}, {cx, cy + 10}, 2.0f, c);
+        DrawLineEx({cx - 5, cy + 3}, {cx + 5, cy + 3}, 2.0f, c);
+        break;
+    case 2: // water ripples
+        for (int k = 0; k < 3; ++k)
+            DrawLineEx({cx - 7, cy - 4 + k * 5.0f}, {cx - 3.5f, cy - 6 + k * 5.0f}, 1.5f, c),
+                DrawLineEx({cx - 3.5f, cy - 6 + k * 5.0f}, {cx, cy - 4 + k * 5.0f}, 1.5f, c),
+                DrawLineEx({cx, cy - 4 + k * 5.0f}, {cx + 3.5f, cy - 6 + k * 5.0f}, 1.5f, c),
+                DrawLineEx({cx + 3.5f, cy - 6 + k * 5.0f}, {cx + 7, cy - 4 + k * 5.0f}, 1.5f, c);
+        break;
+    case 3: // bird
+        DrawEllipse(static_cast<int>(cx), static_cast<int>(cy + 1), 6, 3, c);
+        DrawCircleV({cx + 6, cy - 3}, 2.5f, c);
+        DrawLineEx({cx + 8, cy - 3}, {cx + 11, cy - 1}, 1.5f, c);
+        DrawLineEx({cx - 5, cy + 3}, {cx - 9, cy + 7}, 1.5f, c);
+        DrawLineEx({cx, cy + 4}, {cx, cy + 9}, 1.5f, c);
+        break;
+    case 4: // sun disc
+        DrawRing({cx, cy}, 3.0f, 5.0f, 0, 360, 20, c);
+        DrawCircleV({cx, cy}, 1.6f, c);
+        break;
+    default: // scarab
+        DrawEllipse(static_cast<int>(cx), static_cast<int>(cy), 4, 6, c);
+        DrawLineEx({cx, cy - 6}, {cx, cy + 6}, 1.0f, kOnyx);
+        for (int k = -1; k <= 1; ++k)
+        {
+            DrawLineEx({cx - 4, cy + k * 4.0f}, {cx - 8, cy + k * 4.0f + 2}, 1.5f, c);
+            DrawLineEx({cx + 4, cy + k * 4.0f}, {cx + 8, cy + k * 4.0f + 2}, 1.5f, c);
+        }
+        break;
+    }
+}
+
+// One column seen from above: fluted drum with a lotus capital.
+void DrawPillarTile(Vector2 c, Color stone)
+{
+    DrawEllipse(static_cast<int>(c.x + 3), static_cast<int>(c.y + 5), 18, 17, Fade(BLACK, 0.3f));
+    DrawRectangleRounded({c.x - 17, c.y - 17, 34, 34}, 0.18f, 4, Shade(stone, 0.5f)); // square plinth
+    DrawCircleV(c, 15.5f, Shade(stone, 0.42f));
+    DrawCircleV(c, 14.5f, Shade(stone, 0.95f));
+    for (int k = 0; k < 12; ++k)
+    {
+        const float a = k * 2 * PI / 12;
+        DrawLineEx({c.x + std::cos(a) * 6, c.y + std::sin(a) * 6}, {c.x + std::cos(a) * 14, c.y + std::sin(a) * 14}, 1.5f, Shade(stone, 0.72f));
+    }
+    DrawRing(c, 8.5f, 11, 0, 360, 24, Shade(stone, 1.15f)); // lotus capital
+    for (int k = 0; k < 8; ++k)
+    {
+        const float a = k * 2 * PI / 8 + 0.2f;
+        DrawCircleV({c.x + std::cos(a) * 9.7f, c.y + std::sin(a) * 9.7f}, 2.0f, kGold);
+    }
+    DrawCircleV(c, 6, Shade(stone, 1.2f));
+    DrawCircleV(c, 2.5f, kGoldDark);
+}
+
+void DrawStele(const Piece& p, const ThemeStyle& st)
+{
+    const Rectangle r = Inset(p.r, 2);
+    BoxOutlined(r, kSand, kSandDark, 0.08f, 2);
+    DrawRectangleRec(Strip(r, Horizontal(p) ? Side::Top : Side::Left, 4), kGold);
+    const Rectangle panel = Inset(r, 6);
+    DrawRectangleRec(panel, Shade(kSand, 0.86f));
+    int n = 0;
+    for (float y = panel.y + 10; y < panel.y + panel.height - 4; y += 16)
+    {
+        for (float x = panel.x + 10; x < panel.x + panel.width - 4; x += 16)
+        {
+            DrawGlyph(x, y, static_cast<int>(Hash(p.tx * 7 + n, p.ty * 3 + n, 5)), (n % 3 == 0) ? kLapis : Shade(kSandDark, 0.7f));
+            ++n;
+        }
+    }
+    (void)st;
+}
+
+void DrawAltar(const Piece& p)
+{
+    const Rectangle r = Inset(p.r, 3);
+    BoxOutlined(r, kSand, kSandDark, 0.1f, 2);
+    DrawRectangleLinesEx(Inset(r, 5), 2, kGold);
+    const bool horiz = Horizontal(p);
+    const Rectangle runner = horiz ? Rectangle{r.x + 8, r.y + r.height / 2 - 4, r.width - 16, 8} : Rectangle{r.x + r.width / 2 - 4, r.y + 8, 8, r.height - 16};
+    DrawRectangleRec(runner, kLapis);
+    for (int j = 0; j < p.th; ++j)
+        for (int i = 0; i < p.tw; ++i)
+        {
+            const Vector2 c{p.r.x + i * TS + TS / 2.0f, p.r.y + j * TS + TS / 2.0f};
+            DrawCircleV(c, 8, kGoldDark);
+            DrawCircleV(c, 6, kGold);
+            DrawCircleV(c, 3.5f, (i + j + p.index) % 2 ? Color{190, 60, 50, 255} : Color{70, 150, 80, 255});
+        }
+}
+
+void DrawSarcophagus(const Piece& p)
+{
+    const bool horiz = Horizontal(p);
+    const Rectangle r = Inset(p.r, 3);
+    BoxOutlined(r, kSandDark, kOnyx, 0.12f, 2);
+    const Rectangle lid = Inset(r, 5);
+    Box(lid, kGold, 0.35f);
+    const Vector2 c{lid.x + lid.width / 2, lid.y + lid.height / 2};
+    const float L = (horiz ? lid.width : lid.height) / 2;
+    const float Wd = (horiz ? lid.height : lid.width) / 2;
+    auto pt = [&](float u, float v) { return horiz ? Vector2{c.x + u, c.y + v} : Vector2{c.x + v, c.y + u}; };
+    // Lapis wrapping bands along the body.
+    for (float u = -L * 0.1f; u < L - 6; u += 11)
+    {
+        const Vector2 a = pt(u, -Wd + 3), b = pt(u, Wd - 3);
+        DrawLineEx(a, b, 3.0f, kLapis);
+    }
+    // Head end at the low side: mask with striped headdress.
+    const Vector2 h = pt(-L + Wd + 2, 0);
+    DrawCircleV(h, Wd, kLapis);
+    DrawCircleV(h, Wd - 3, kGold);
+    for (int k = -1; k <= 1; k += 2)
+        DrawLineEx(pt(-L + Wd + 2 - Wd * 0.6f, k * Wd * 0.7f), pt(-L + Wd + 2 + Wd * 0.7f, k * Wd * 0.7f), 2.0f, kLapis);
+    DrawCircleV(h, Wd * 0.5f, Color{226, 190, 140, 255});
+    DrawCircleV(pt(-L + Wd + 2 - 2, -Wd * 0.18f), 1.4f, kOnyx);
+    DrawCircleV(pt(-L + Wd + 2 - 2, Wd * 0.18f), 1.4f, kOnyx);
+    // Crossed arms (a small X) on the chest.
+    DrawLineEx(pt(-L * 0.35f - 4, -4), pt(-L * 0.35f + 4, 4), 2.0f, kTurquoise);
+    DrawLineEx(pt(-L * 0.35f - 4, 4), pt(-L * 0.35f + 4, -4), 2.0f, kTurquoise);
+}
+
+void DrawPalm(const Piece& p)
+{
+    if (p.tw * p.th > 1)
+    {
+        BoxOutlined(Inset(p.r, 2), kSand, kSandDark, 0.08f, 3);
+        DrawRectangleRec(Inset(p.r, 7), Color{96, 74, 50, 255});
+    }
+    for (int j = 0; j < p.th; ++j)
+        for (int i = 0; i < p.tw; ++i)
+        {
+            const Vector2 c{p.r.x + i * TS + TS / 2.0f, p.r.y + j * TS + TS / 2.0f};
+            if (p.tw * p.th == 1)
+            {
+                DrawCircleV(c, 14, Color{176, 104, 64, 255});
+                DrawCircleV(c, 11, Color{92, 64, 44, 255});
+            }
+            for (int k = 0; k < 8; ++k)
+            {
+                const float a = k * PI / 4 + p.index * 0.4f + i + j;
+                DrawLineEx(c, {c.x + std::cos(a) * 16, c.y + std::sin(a) * 16}, 6.0f, k % 2 ? Color{58, 126, 64, 255} : Color{88, 156, 74, 255});
+                DrawLineEx(c, {c.x + std::cos(a) * 14, c.y + std::sin(a) * 14}, 1.5f, Color{40, 96, 48, 255});
+            }
+            DrawCircleV(c, 4, Color{110, 76, 44, 255});
+        }
+}
+
+void DrawUrns(const Piece& p)
+{
+    for (int j = 0; j < p.th; ++j)
+        for (int i = 0; i < p.tw; ++i)
+        {
+            const Rectangle t{p.r.x + i * TS + 2.0f, p.r.y + j * TS + 2.0f, TS - 4.0f, TS - 4.0f};
+            const Vector2 c{t.x + t.width / 2, t.y + t.height / 2};
+            switch (Hash(p.tx + i, p.ty + j, 61) % 3)
+            {
+            case 0: // clay urn
+                DrawCircleV(c, 15, Color{150, 86, 54, 255});
+                DrawRing(c, 10, 14, 0, 360, 24, Color{188, 112, 70, 255});
+                DrawCircleV(c, 9, Color{40, 28, 24, 255});
+                DrawRing(c, 14, 15, 0, 360, 24, kGold);
+                break;
+            case 1: // sandstone block
+                BoxOutlined(t, kSand, kSandDark, 0.1f, 2);
+                DrawLine(static_cast<int>(t.x), static_cast<int>(c.y), static_cast<int>(t.x + t.width), static_cast<int>(c.y), kSandDark);
+                DrawLine(static_cast<int>(c.x), static_cast<int>(t.y), static_cast<int>(c.x), static_cast<int>(c.y), kSandDark);
+                break;
+            default: // canopic jar with a jackal lid
+                DrawCircleV(c, 14, kSandDark);
+                DrawCircleV(c, 11, kSand);
+                DrawEllipse(static_cast<int>(c.x), static_cast<int>(c.y + 2), 4, 7, kOnyx);
+                DrawCircleV({c.x - 5, c.y - 5}, 2.5f, kOnyx);
+                DrawCircleV({c.x + 5, c.y - 5}, 2.5f, kOnyx);
+                DrawRing(c, 11, 13, 0, 360, 24, kLapis);
+                break;
+            }
+        }
+}
+
+void DrawBrazier(const Piece& p)
+{
+    BoxOutlined(Inset(p.r, 2), kSandDark, kOnyx, 0.12f, 2);
+    for (int j = 0; j < p.th; ++j)
+        for (int i = 0; i < p.tw; ++i)
+        {
+            const Vector2 c{p.r.x + i * TS + TS / 2.0f, p.r.y + j * TS + TS / 2.0f};
+            DrawCircleV(c, 15, kGoldDark);
+            DrawCircleV(c, 12, kOnyx);
+            const float flick = 1.0f + 0.1f * std::sin(static_cast<float>(i * 3 + j));
+            DrawCircleV(c, 9 * flick, Color{240, 110, 40, 255});
+            DrawCircleV(c, 6, Color{255, 190, 70, 255});
+            DrawCircleV(c, 3, Color{255, 245, 170, 255});
+        }
+}
+
+void DrawReflectingPool(const Piece& p)
+{
+    const Rectangle r = Inset(p.r, 2);
+    BoxOutlined(r, kSand, kSandDark, 0.12f, 2);
+    const Rectangle w = Inset(r, 6);
+    Box(w, Color{56, 144, 190, 255}, 0.2f);
+    for (float y = w.y + 6; y < w.y + w.height - 3; y += 9)
+        DrawLine(static_cast<int>(w.x + 6), static_cast<int>(y), static_cast<int>(w.x + w.width - 6), static_cast<int>(y), Color{110, 186, 220, 255});
+    for (int k = 0; k < p.tw * p.th; ++k)
+    {
+        const int i = k % p.tw, j = k / p.tw;
+        const Vector2 c{p.r.x + i * TS + 10 + Rand01(p.tx + i, p.ty + j, 71) * 20, p.r.y + j * TS + 10 + Rand01(p.tx + i, p.ty + j, 72) * 20};
+        DrawCircleV(c, 6, Color{60, 130, 70, 255});
+        DrawCircleV({c.x + 1, c.y - 1}, 3, Color{240, 140, 170, 255});
+    }
+}
+
+void DrawStoneBench(const Piece& p)
+{
+    const Rectangle r = Inset(p.r, 3);
+    BoxOutlined(r, kSand, kSandDark, 0.15f, 2);
+    BoxOutlined(Inset(r, 5), kLapis, kGold, 0.2f, 2);
+}
+
+void DrawStatue(const Piece& p)
+{
+    const Rectangle r = Inset(p.r, 2);
+    BoxOutlined(r, kSandDark, kOnyx, 0.1f, 2);
+    Box(Inset(r, 4), kSand, 0.1f);
+    if (p.tw * p.th == 1)
+    {
+        // Jackal-headed guardian bust.
+        const Vector2 c{r.x + r.width / 2, r.y + r.height / 2 + 1};
+        DrawCircleV(c, 11, kOnyx);
+        DrawRing(c, 8, 11, 0, 360, 20, kGold);
+        DrawEllipse(static_cast<int>(c.x), static_cast<int>(c.y + 3), 4, 8, Color{60, 56, 68, 255});
+        FillPolygon({c.x - 5, c.y - 7}, {{c.x - 8, c.y - 3}, {c.x - 6, c.y - 15}, {c.x - 2, c.y - 5}}, kOnyx);
+        FillPolygon({c.x + 5, c.y - 7}, {{c.x + 8, c.y - 3}, {c.x + 6, c.y - 15}, {c.x + 2, c.y - 5}}, kOnyx);
+        DrawCircleV({c.x - 3, c.y - 2}, 1.4f, kGold);
+        DrawCircleV({c.x + 3, c.y - 2}, 1.4f, kGold);
+        return;
+    }
+    // Sphinx along the long axis, head at the high end.
+    const bool horiz = Horizontal(p);
+    const Vector2 c{r.x + r.width / 2, r.y + r.height / 2};
+    const float L = (horiz ? r.width : r.height) / 2 - 4;
+    const float Wd = (horiz ? r.height : r.width) / 2 - 4;
+    auto pt = [&](float u, float v) { return horiz ? Vector2{c.x + u, c.y + v} : Vector2{c.x + v, c.y + u}; };
+    Ellipse(pt(-L * 0.2f, 0), L * 0.62f, Wd * 0.72f, horiz, Color{214, 178, 122, 255});
+    for (int k = -1; k <= 1; k += 2)
+    {
+        const Vector2 a = pt(L * 0.30f, k * Wd * 0.42f), b = pt(L * 0.86f, k * Wd * 0.42f);
+        DrawLineEx(a, b, Wd * 0.34f, Color{226, 192, 138, 255});
+    }
+    DrawLineEx(pt(-L * 0.8f, 0), pt(-L * 0.98f, Wd * 0.45f), 2.0f, Color{170, 130, 84, 255});
+    const Vector2 h = pt(L * 0.32f, 0);
+    DrawCircleV(h, Wd * 0.62f, kLapis);
+    DrawCircleV(h, Wd * 0.62f - 3, kGold);
+    DrawCircleV(h, Wd * 0.36f, Color{226, 190, 140, 255});
+}
+
+void DrawTreasure(const Piece& p)
+{
+    for (int j = 0; j < p.th; ++j)
+        for (int i = 0; i < p.tw; ++i)
+        {
+            const Rectangle t{p.r.x + i * TS + 2.0f, p.r.y + j * TS + 2.0f, TS - 4.0f, TS - 4.0f};
+            const Vector2 c{t.x + t.width / 2, t.y + t.height / 2};
+            if (Hash(p.tx + i, p.ty + j, 81) % 2 == 0)
+            {
+                // Chest
+                BoxOutlined(t, Color{116, 72, 40, 255}, Color{60, 36, 22, 255}, 0.15f, 2);
+                DrawRectangleRec({t.x + 2, c.y - 3, t.width - 4, 6}, kGold);
+                DrawRectangleRec({c.x - 3, t.y + 3, 6, t.height - 6}, kGoldDark);
+                DrawCircleV(c, 3.5f, kGold);
+            }
+            else
+            {
+                // Heap of coins and gems
+                DrawCircleV({c.x, c.y + 2}, 15, kGoldDark);
+                for (int k = 0; k < 9; ++k)
+                {
+                    const Vector2 q{c.x - 9 + Rand01(p.tx + i, p.ty + j, 90 + k) * 18, c.y - 9 + Rand01(p.tx + i, p.ty + j, 110 + k) * 18};
+                    DrawCircleV(q, 4.5f, k % 2 ? kGold : Color{212, 160, 48, 255});
+                }
+                DrawCircleV({c.x + 4, c.y - 4}, 2.2f, Color{200, 50, 60, 255});
+                DrawCircleV({c.x - 5, c.y + 3}, 2.2f, Color{60, 120, 220, 255});
+            }
+        }
+}
+
+// Returns false if this letter has no Egypt-specific art (falls back to the house furniture).
+bool DrawEgyptPiece(const Piece& p, const ThemeStyle& st)
+{
+    switch (p.kind)
+    {
+    case 'B': DrawStele(p, st); return true;
+    case 'T': DrawAltar(p); return true;
+    case 'D': DrawSarcophagus(p); return true;
+    case 'L': DrawPalm(p); return true;
+    case 'X': DrawUrns(p); return true;
+    case 'F': DrawBrazier(p); return true;
+    case 'U': DrawReflectingPool(p); return true;
+    case 'S': DrawStoneBench(p); return true;
+    case 'M': DrawStatue(p); return true;
+    case 'V': DrawTreasure(p); return true;
+    case 'N':
+        for (int j = 0; j < p.th; ++j)
+            for (int i = 0; i < p.tw; ++i)
+                DrawPillarTile({p.r.x + i * TS + TS / 2.0f, p.r.y + j * TS + TS / 2.0f}, Color{226, 216, 194, 255});
+        return true;
+    default: return false;
+    }
+}
+
 void DrawPiece(const Level& level, const Piece& p, RoomTheme theme, const ThemeStyle& st)
 {
     // Soft drop shadow first (pieces sit on the floor). Round tables and pianos draw their own.
     const bool roundTable = p.kind == 'T' && (theme == RoomTheme::Foyer || theme == RoomTheme::Parlor || theme == RoomTheme::Hallway) &&
                             !(p.tw * p.th == 1);
-    if (!roundTable && p.kind != 'Q')
+    const bool egypt = IsEgyptTheme(theme);
+    const bool ownShadow = egypt && (p.kind == 'N' || p.kind == 'L' || p.kind == 'X' || p.kind == 'V');
+    if (!roundTable && p.kind != 'Q' && !ownShadow)
         DrawRectangleRounded({p.r.x + 4, p.r.y + 5, p.r.width - 4, p.r.height - 4}, 0.15f, 6, Fade(BLACK, 0.25f));
+    if (egypt && DrawEgyptPiece(p, st)) return;
     switch (p.kind)
     {
     case 'B': DrawShelf(p, theme, st); break;
@@ -1006,9 +1376,25 @@ void DrawWalls(const Level& level, const ThemeStyle& st)
             const int px = x * TS;
             const int py = y * TS;
             DrawRectangle(px, py, TS, TS, st.wall);
+            if (st.stone)
+            {
+                // Carved sandstone courses.
+                DrawRectangle(px, py, TS, TS, Mix(st.wall, st.wallTop, Rand01(x, y, 31) * 0.3f));
+                for (int k = 0; k < 2; ++k)
+                {
+                    DrawLine(px, py + k * 20, px + TS, py + k * 20, Shade(st.wall, 0.7f));
+                    const int sx = px + (((x + y + k) % 2) ? 10 : 30);
+                    DrawLine(sx, py + k * 20, sx, py + k * 20 + 20, Shade(st.wall, 0.7f));
+                }
+            }
             auto open = [&](int nx, int ny) { return nx >= 0 && ny >= 0 && nx < w && ny < h && level.At(nx, ny) != Tile::Wall; };
             // A light cap on edges that face into the room, a dark base line under it.
             if (open(x, y + 1)) { DrawRectangle(px, py + TS - 8, TS, 8, st.wallTop); DrawRectangle(px, py + TS - 2, TS, 2, Shade(st.wall, 0.6f)); }
+            if (st.stone && open(x, y + 1))
+            {
+                DrawRectangle(px, py + TS - 12, TS, 3, st.accent);
+                if (Hash(x, y, 50) % 3 != 0) DrawGlyph(px + 20.0f, py + 14.0f, static_cast<int>(Hash(x, y, 51)), Fade(st.accent, 0.9f));
+            }
             if (open(x, y - 1)) DrawRectangle(px, py, TS, 4, st.wallTop);
             if (open(x - 1, y)) DrawRectangle(px, py, 4, TS, st.wallTop);
             if (open(x + 1, y)) DrawRectangle(px + TS - 4, py, 4, TS, st.wallTop);

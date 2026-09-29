@@ -5,11 +5,12 @@
 #include <fstream>
 
 #include "Sprites.h"
+#include "Viewport.h"
 #include "raylib.h"
 
 namespace
 {
-const char* const kWorldNames[] = {"The House", "The Garden", "The Barn", "The Factory", "The City"};
+const char* const kWorldNames[] = {"The House", "Through History", "The Barn", "The Factory", "The City"};
 const char* const kCredit = "made by Lucas";
 
 // World select layout
@@ -55,12 +56,6 @@ void DrawCoin(Vector2 c, float r)
     DrawCircleV({c.x - r * 0.3f, c.y - r * 0.3f}, r * 0.16f, Fade(WHITE, 0.7f));
 }
 
-void DrawOpenPadlock(Vector2 c, float s, Color color)
-{
-    DrawRing({c.x + 8 * s, c.y - 10 * s}, 6 * s, 9 * s, 180.0f, 360.0f, 24, color); // shackle swung open
-    DrawRectangleRounded({c.x - 12 * s, c.y - 4 * s, 24 * s, 18 * s}, 0.3f, 6, color);
-}
-
 void DrawPadlock(Vector2 c, float s, Color color)
 {
     DrawRing({c.x, c.y - 4 * s}, 6 * s, 9 * s, 180.0f, 360.0f, 24, color);             // shackle
@@ -72,14 +67,23 @@ void DrawPadlock(Vector2 c, float s, Color color)
 
 void App::Init()
 {
-    const std::string dir = GetApplicationDirectory();
-    savePath_ = dir + "save_world1.txt"; // v2 levels (the house rooms); older saves are ignored
-    profile_.Load(dir + "profile.txt");    // coins and skins
+    profile_.Load(std::string(GetApplicationDirectory()) + "profile.txt"); // coins and skins
+    LoadWorld(1); // so both cards know their progress...
+    LoadWorld(0); // ...and World 1 is the one left loaded
+}
 
-    // Find level1.txt, level2.txt, ... until one is missing, so new levels are picked up automatically.
+void App::LoadWorld(int world)
+{
+    const std::string dir = GetApplicationDirectory();
+    activeWorld_ = world;
+    levels_.clear();
+    savePath_ = dir + "save_world" + std::to_string(world + 1) + ".txt"; // v2 levels (the house rooms); older saves are ignored
+
+    // Find level1.txt, level2.txt, ... (World 2: w2_level1.txt, ...) until one is missing, so new levels are picked up automatically.
+    const std::string prefix = world == 0 ? "assets/levels/level" : "assets/levels/w" + std::to_string(world + 1) + "_level";
     for (int i = 1; i <= SlotsPerWorld; ++i)
     {
-        const std::string path = dir + TextFormat("assets/levels/level%d.txt", i);
+        const std::string path = dir + prefix + std::to_string(i) + ".txt";
         if (!FileExists(path.c_str())) break;
 
         Level level;
@@ -87,13 +91,13 @@ void App::Init()
 
         LevelEntry entry;
         entry.path = path;
-        entry.name = level.Name().empty() ? TextFormat("Level %d", i) : level.Name();
+        entry.name = level.Name().empty() ? "Level " + std::to_string(i) : level.Name();
         for (const CatSpawn& cat : level.Cats()) entry.hasKind[static_cast<int>(cat.kind)] = true;
         levels_.push_back(entry);
     }
 
-    // The secret boss level comes after all 25 regular ones.
-    const std::string bossPath = dir + "assets/levels/boss1.txt";
+    // The secret boss level comes after all 25 regular ones (bossN.txt for world N).
+    const std::string bossPath = dir + "assets/levels/boss" + std::to_string(world + 1) + ".txt";
     Level boss;
     if (static_cast<int>(levels_.size()) == SlotsPerWorld && FileExists(bossPath.c_str()) && boss.LoadFromFile(bossPath))
     {
@@ -105,6 +109,15 @@ void App::Init()
         levels_.push_back(entry);
     }
     LoadSave();
+    RefreshSummary();
+}
+
+void App::RefreshSummary()
+{
+    WorldSummary& s = summary_[activeWorld_];
+    s.cleared = ClearedCount();
+    s.playable = static_cast<int>(std::count_if(levels_.begin(), levels_.end(), [](const LevelEntry& e) { return !e.isBoss; }));
+    s.bossBeaten = BossBeaten();
 }
 
 bool App::Update()
@@ -131,8 +144,8 @@ void App::UpdateIntro()
 
 void App::DrawIntro() const
 {
-    const int w = GetScreenWidth();
-    const int h = GetScreenHeight();
+    const int w = LogicalWidth;
+    const int h = LogicalHeight;
     const Color bg{14, 12, 11, 255};
     ClearBackground(bg);
 
@@ -172,7 +185,7 @@ void App::DrawIntro() const
 Rectangle App::WorldCardRect(int index) const
 {
     const int total = WorldCount * CardWidth + (WorldCount - 1) * CardGap;
-    const int x = GetScreenWidth() / 2 - total / 2 + index * (CardWidth + CardGap);
+    const int x = LogicalWidth / 2 - total / 2 + index * (CardWidth + CardGap);
     return {static_cast<float>(x), static_cast<float>(CardTop), static_cast<float>(CardWidth), static_cast<float>(CardHeight)};
 }
 
@@ -198,26 +211,31 @@ void App::UpdateWorlds()
     if (IsKeyPressed(KEY_S) || (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), ShopButtonRect())))
     {
         screen_ = Screen::Shop;
-        shopSel_ = static_cast<int>(profile_.Equipped());
+        shopTab_ = 0;
+        shopSel_ = 0;
+        for (int i = 0; i < SkinsInCategory(SkinCategory::Mouse); ++i)
+            if (profile_.IsEquipped(SkinIdIn(SkinCategory::Mouse, i))) shopSel_ = i;
         shopToastTimer_ = 0.0f;
         return;
     }
     const bool activate = clicked || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE);
-    if (activate && selectedWorld_ == 0)
+    if (activate && WorldUnlocked(selectedWorld_))
     {
+        if (selectedWorld_ != activeWorld_) LoadWorld(selectedWorld_);
         screen_ = Screen::Levels;
         selectedSlot_ = 0;
+        while (selectedSlot_ + 1 < static_cast<int>(levels_.size()) && levels_[selectedSlot_].bestTime >= 0.0f) ++selectedSlot_; // first level not beaten yet
     }
-    else if (activate && WorldUnlocked(selectedWorld_))
+    else if (activate)
     {
-        toastTimer_ = 2.5f; // unlocked, but not built yet
+        toastTimer_ = 2.5f; // locked, or not built yet
     }
 }
 
 void App::DrawWorlds() const
 {
-    const int w = GetScreenWidth();
-    const int h = GetScreenHeight();
+    const int w = LogicalWidth;
+    const int h = LogicalHeight;
     DrawBackground();
 
     DrawCentered("MouseGame", w / 2 + 4, 44, 80, {0, 0, 0, 120});
@@ -241,17 +259,35 @@ void App::DrawWorlds() const
         const bool sel = i == selectedWorld_;
         const int cx = static_cast<int>(r.x + r.width / 2);
 
-        if (i > 0 && WorldUnlocked(i))
+        if (i == 1 && WorldUnlocked(1))
         {
-            // Unlocked by beating the previous boss, but not built yet.
-            const Color garden{52, 78, 56, 255};
-            DrawRectangleRounded(r, 0.12f, 8, sel ? Color{64, 96, 68, 255} : garden);
-            DrawRectangleRoundedLinesEx(r, 0.12f, 8, sel ? 3.0f : 2.0f, sel ? GOLD : Color{90, 130, 96, 255});
-            DrawCentered(TextFormat("WORLD %d", i + 1), cx, static_cast<int>(r.y + 22), 22, Color{170, 230, 170, 255});
-            DrawOpenPadlock({r.x + r.width / 2, r.y + r.height / 2 - 20}, 2.0f, Color{170, 230, 170, 255});
-            DrawCentered(kWorldNames[i], cx, static_cast<int>(r.y + 205), 26, RAYWHITE);
-            DrawCentered("Unlocked!", cx, static_cast<int>(r.y + 240), 20, Color{130, 225, 150, 255});
-            DrawCentered("Coming soon", cx, static_cast<int>(r.y + 268), 18, LIGHTGRAY);
+            // World 2: a desert sky, the sun and two pyramids.
+            DrawRectangleRounded(r, 0.12f, 8, sel ? Color{112, 88, 52, 255} : Color{86, 68, 44, 255});
+            if (sel) DrawRectangleRoundedLinesEx(r, 0.12f, 8, 3.0f, GOLD);
+            DrawCentered("WORLD 2", cx, static_cast<int>(r.y + 22), 22, Color{240, 200, 110, 255});
+            const Rectangle art{r.x + 20, r.y + 60, r.width - 40, 130};
+            DrawRectangleGradientV(static_cast<int>(art.x), static_cast<int>(art.y), static_cast<int>(art.width), 90, {232, 150, 90, 255}, {250, 214, 150, 255});
+            DrawCircleV({art.x + art.width * 0.72f, art.y + 46}, 17, {255, 236, 170, 255});
+            const float base = art.y + 100;
+            DrawTriangle({art.x + 20, base}, {art.x + 105, base}, {art.x + 66, art.y + 30}, {188, 146, 92, 255});
+            DrawTriangle({art.x + 66, art.y + 30}, {art.x + 105, base}, {art.x + 80, base}, {150, 112, 70, 255});
+            DrawTriangle({art.x + 96, base}, {art.x + 150, base}, {art.x + 122, art.y + 58}, {204, 162, 106, 255});
+            DrawRectangle(static_cast<int>(art.x), static_cast<int>(base), static_cast<int>(art.width), 30, {214, 178, 118, 255});
+            DrawRectangle(static_cast<int>(art.x), static_cast<int>(base + 12), static_cast<int>(art.width), 18, {196, 158, 100, 255});
+            MouseLook mouse;
+            mouse.pos = {art.x + 40, base + 16};
+            mouse.facing = {1, 0};
+            mouse.scale = 0.8f;
+            mouse.skin = profile_.MouseLook();
+            DrawMouseSprite(mouse);
+
+            DrawCentered(kWorldNames[1], cx, static_cast<int>(r.y + 207), 22, RAYWHITE);
+            const WorldSummary& s = summary_[1];
+            DrawCentered(TextFormat("%d / %d cleared", s.cleared, s.playable), cx, static_cast<int>(r.y + 240), 18, LIGHTGRAY);
+            const Rectangle bar{r.x + 24, r.y + 270, r.width - 48, 10};
+            DrawRectangleRounded(bar, 1.0f, 6, {40, 34, 30, 255});
+            if (s.playable > 0 && s.cleared > 0) DrawRectangleRounded({bar.x, bar.y, bar.width * s.cleared / s.playable, bar.height}, 1.0f, 6, kCleared);
+            DrawCentered(TextFormat("%d of %d rooms built", s.playable, SlotsPerWorld), cx, static_cast<int>(r.y + 292), 16, {214, 190, 140, 255});
             continue;
         }
         if (i > 0)
@@ -261,7 +297,13 @@ void App::DrawWorlds() const
             DrawRectangleRoundedLinesEx(r, 0.12f, 8, sel ? 3.0f : 2.0f, sel ? Color{90, 84, 78, 255} : kLockedEdge);
             DrawCentered(TextFormat("WORLD %d", i + 1), cx, static_cast<int>(r.y + 22), 22, {70, 65, 60, 255});
             DrawPadlock({r.x + r.width / 2, r.y + r.height / 2 - 10}, 2.0f, {70, 65, 60, 255});
-            DrawCentered("Coming soon", cx, static_cast<int>(r.y + r.height - 60), 20, {110, 104, 98, 255});
+            if (i == 1)
+            {
+                DrawCentered(kWorldNames[1], cx, static_cast<int>(r.y + r.height - 90), 22, {110, 104, 98, 255});
+                DrawCentered("Beat the World 1 boss", cx, static_cast<int>(r.y + r.height - 58), 16, {150, 128, 96, 255});
+                DrawCentered("to unlock", cx, static_cast<int>(r.y + r.height - 38), 16, {150, 128, 96, 255});
+            }
+            else DrawCentered("Coming soon", cx, static_cast<int>(r.y + r.height - 60), 20, {110, 104, 98, 255});
             continue;
         }
 
@@ -291,21 +333,22 @@ void App::DrawWorlds() const
         DrawCatSprite(cat);
 
         DrawCentered(kWorldNames[0], cx, static_cast<int>(r.y + 205), 26, RAYWHITE);
-        const int cleared = ClearedCount();
-        const int playable = std::min(static_cast<int>(levels_.size()), SlotsPerWorld);
+        const int cleared = summary_[0].cleared;
+        const int playable = summary_[0].playable;
         DrawCentered(TextFormat("%d / %d cleared", cleared, playable), cx, static_cast<int>(r.y + 240), 18, LIGHTGRAY);
-        if (BossBeaten()) DrawCentered("Boss defeated!", cx, static_cast<int>(r.y + 290), 16, GOLD);
+        if (summary_[0].bossBeaten) DrawCentered("Boss defeated!", cx, static_cast<int>(r.y + 290), 16, GOLD);
         const Rectangle bar{r.x + 24, r.y + 270, r.width - 48, 10};
         DrawRectangleRounded(bar, 1.0f, 6, {40, 34, 30, 255});
         if (playable > 0 && cleared > 0)
             DrawRectangleRounded({bar.x, bar.y, bar.width * cleared / playable, bar.height}, 1.0f, 6, kCleared);
     }
 
-    DrawCentered("Left/Right or mouse to choose   -   Enter or click to play   -   S: shop   -   Esc to quit", w / 2, h - 40, 18, GRAY);
+    DrawCentered("Left/Right or mouse to choose   -   Enter or click to play   -   S: shop   -   F11: fullscreen   -   Esc to quit", w / 2, h - 40, 18, GRAY);
 
     if (toastTimer_ > 0.0f)
     {
-        const char* msg = TextFormat("World %d: %s is still being built. Coming soon!", selectedWorld_ + 1, kWorldNames[selectedWorld_]);
+        const char* msg = selectedWorld_ == 1 ? "World 2 opens when you defeat the boss of World 1 (beat all 25 levels first)"
+                                              : TextFormat("World %d: %s is still being built. Coming soon!", selectedWorld_ + 1, kWorldNames[selectedWorld_]);
         const int tw = MeasureText(msg, 22) + 40;
         const float a = std::min(1.0f, toastTimer_);
         DrawRectangleRounded({w / 2.0f - tw / 2.0f, 540, static_cast<float>(tw), 44}, 0.4f, 8, Fade(BLACK, 0.8f * a));
@@ -329,7 +372,7 @@ Rectangle App::LevelSlotRect(int index) const
     const int total = grid + (HasBoss() ? BossGap + BossWidth : 0);
     const int col = index % GridColumns;
     const int row = index / GridColumns;
-    return {static_cast<float>(GetScreenWidth() / 2 - total / 2 + col * (SlotWidth + SlotGap)),
+    return {static_cast<float>(LogicalWidth / 2 - total / 2 + col * (SlotWidth + SlotGap)),
             static_cast<float>(GridTop + row * (SlotHeight + SlotGap)), static_cast<float>(SlotWidth), static_cast<float>(SlotHeight)};
 }
 
@@ -380,11 +423,11 @@ void App::UpdateLevels()
 
 void App::DrawLevels() const
 {
-    const int w = GetScreenWidth();
-    const int h = GetScreenHeight();
+    const int w = LogicalWidth;
+    const int h = LogicalHeight;
     DrawBackground();
 
-    DrawCentered(TextFormat("World 1: %s", kWorldNames[0]), w / 2, 40, 48, GOLD);
+    DrawCentered(TextFormat("World %d: %s", activeWorld_ + 1, kWorldNames[activeWorld_]), w / 2, 40, 48, GOLD);
     DrawText("Esc: back", 24, 24, 20, GRAY);
 
     for (int i = 0; i < SlotsPerWorld; ++i)
@@ -485,41 +528,52 @@ void App::DrawLevels() const
 
 namespace
 {
-constexpr int ShopCardW = 230;
-constexpr int ShopCardH = 350;
-constexpr int ShopCardGap = 24;
-constexpr int ShopCardTop = 165;
-constexpr int ShopSlots = 4; // the real skins, then "coming soon" placeholders
+constexpr int ShopCols = 4;
+constexpr int ShopCardW = 240;
+constexpr int ShopCardH = 218;
+constexpr int ShopCardGap = 20;
+constexpr int ShopCardTop = 166;
+constexpr int ShopTabW = 140;
+constexpr int ShopTabH = 38;
+constexpr int ShopTabGap = 10;
 } // namespace
 
 Rectangle App::ShopButtonRect() const
 {
-    return {GetScreenWidth() - 220.0f, 24.0f, 196.0f, 48.0f};
+    return {LogicalWidth - 220.0f, 24.0f, 196.0f, 48.0f};
 }
 
 Rectangle App::ShopCardRect(int index) const
 {
-    const int total = ShopSlots * ShopCardW + (ShopSlots - 1) * ShopCardGap;
-    const int x = GetScreenWidth() / 2 - total / 2 + index * (ShopCardW + ShopCardGap);
-    return {static_cast<float>(x), static_cast<float>(ShopCardTop), static_cast<float>(ShopCardW), static_cast<float>(ShopCardH)};
+    const int total = ShopCols * ShopCardW + (ShopCols - 1) * ShopCardGap;
+    const int x = LogicalWidth / 2 - total / 2 + (index % ShopCols) * (ShopCardW + ShopCardGap);
+    const int y = ShopCardTop + (index / ShopCols) * (ShopCardH + 16);
+    return {static_cast<float>(x), static_cast<float>(y), static_cast<float>(ShopCardW), static_cast<float>(ShopCardH)};
+}
+
+Rectangle App::ShopTabRect(int index) const
+{
+    const int total = SkinCategoryCount * ShopTabW + (SkinCategoryCount - 1) * ShopTabGap;
+    return {static_cast<float>(LogicalWidth / 2 - total / 2 + index * (ShopTabW + ShopTabGap)), 112.0f, static_cast<float>(ShopTabW),
+            static_cast<float>(ShopTabH)};
 }
 
 void App::ActivateShopCard(int index)
 {
-    if (index < 0 || index >= MouseSkinCount) return;
-    const MouseSkin skin = static_cast<MouseSkin>(index);
-    const SkinInfo& info = GetSkinInfo(skin);
-    if (profile_.Equipped() == skin) return; // already wearing it
+    if (index < 0 || index >= SkinsInCategory(ShopCategory())) return;
+    const int id = SkinIdIn(ShopCategory(), index);
+    const SkinInfo& info = GetSkinInfo(id);
+    if (profile_.IsEquipped(id)) return; // already wearing it
 
-    if (profile_.Owns(skin))
+    if (profile_.Owns(id))
     {
-        profile_.Equip(skin);
+        profile_.Equip(id);
         shopToast_ = std::string("Equipped ") + info.name;
         shopToastGood_ = true;
     }
-    else if (profile_.Buy(skin))
+    else if (profile_.Buy(id))
     {
-        profile_.Equip(skin);
+        profile_.Equip(id);
         shopToast_ = std::string("Bought ") + info.name + "! You're wearing it now.";
         shopToastGood_ = true;
     }
@@ -540,11 +594,33 @@ void App::UpdateShop()
         screen_ = Screen::Worlds;
         return;
     }
-    if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) shopSel_ = std::min(shopSel_ + 1, MouseSkinCount - 1);
+
+    // Category tabs: Tab / E next, Q previous, or click one.
+    int tab = shopTab_;
+    const bool shift = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
+    if (IsKeyPressed(KEY_E) || (IsKeyPressed(KEY_TAB) && !shift)) tab = (tab + 1) % SkinCategoryCount;
+    if (IsKeyPressed(KEY_Q) || (IsKeyPressed(KEY_TAB) && shift)) tab = (tab + SkinCategoryCount - 1) % SkinCategoryCount;
+    for (int i = 0; i < SkinCategoryCount; ++i)
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), ShopTabRect(i))) tab = i;
+    if (tab != shopTab_)
+    {
+        shopTab_ = tab;
+        shopSel_ = 0;
+        // Start on the skin being worn.
+        for (int i = 0; i < SkinsInCategory(ShopCategory()); ++i)
+            if (profile_.IsEquipped(SkinIdIn(ShopCategory(), i))) shopSel_ = i;
+        shopToastTimer_ = 0.0f;
+    }
+
+    // Cards: arrows / WASD move around the grid, the mouse hovers, Enter or click buys / equips.
+    const int count = SkinsInCategory(ShopCategory());
+    if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) shopSel_ = std::min(shopSel_ + 1, count - 1);
     if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) shopSel_ = std::max(shopSel_ - 1, 0);
+    if ((IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) && shopSel_ + ShopCols < count) shopSel_ += ShopCols;
+    if ((IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) && shopSel_ - ShopCols >= 0) shopSel_ -= ShopCols;
 
     bool clicked = false;
-    for (int i = 0; i < MouseSkinCount; ++i)
+    for (int i = 0; i < count; ++i)
     {
         if (!CheckCollisionPointRec(GetMousePosition(), ShopCardRect(i))) continue;
         clicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
@@ -555,14 +631,13 @@ void App::UpdateShop()
 
 void App::DrawShop() const
 {
-    const int w = GetScreenWidth();
-    const int h = GetScreenHeight();
+    const int w = LogicalWidth;
+    const int h = LogicalHeight;
     const float t = static_cast<float>(GetTime());
     DrawBackground();
 
-    DrawCentered("Shop", w / 2 + 3, 34, 64, {0, 0, 0, 120});
-    DrawCentered("Shop", w / 2, 31, 64, GOLD);
-    DrawCentered("Mouse skins", w / 2, 108, 26, LIGHTGRAY);
+    DrawCentered("Shop", w / 2 + 3, 20, 64, {0, 0, 0, 120});
+    DrawCentered("Shop", w / 2, 17, 64, GOLD);
     DrawText("Esc: back", 24, 24, 20, GRAY);
 
     // Coin balance, top right.
@@ -575,69 +650,101 @@ void App::DrawShop() const
         DrawText("coins", static_cast<int>(b.x + b.width - MeasureText("coins", 20) - 14), static_cast<int>(b.y + 13), 20, LIGHTGRAY);
     }
 
-    for (int i = 0; i < ShopSlots; ++i)
+    // Category tabs: the mouse, then one per cat type.
+    for (int i = 0; i < SkinCategoryCount; ++i)
+    {
+        const Rectangle r = ShopTabRect(i);
+        const bool cur = i == shopTab_;
+        const bool hot = CheckCollisionPointRec(GetMousePosition(), r);
+        DrawRectangleRounded(r, 0.4f, 8, cur ? kPanelHover : (hot ? Color{54, 46, 40, 255} : Color{40, 35, 32, 255}));
+        DrawRectangleRoundedLinesEx(r, 0.4f, 8, cur ? 3.0f : 1.5f, cur ? GOLD : Color{90, 76, 62, 255});
+        const char* name = SkinCategoryName(static_cast<SkinCategory>(i));
+        DrawText(name, static_cast<int>(r.x + r.width / 2) - MeasureText(name, 22) / 2, static_cast<int>(r.y + 8), 22, cur ? GOLD : LIGHTGRAY);
+    }
+
+    const SkinCategory category = ShopCategory();
+    const int count = SkinsInCategory(category);
+    for (int i = 0; i <= count && i < 2 * ShopCols; ++i)
     {
         const Rectangle r = ShopCardRect(i);
         const int cx = static_cast<int>(r.x + r.width / 2);
 
-        if (i >= MouseSkinCount)
+        if (i == count)
         {
             DrawRectangleRounded(r, 0.08f, 8, kLocked);
             DrawRectangleRoundedLinesEx(r, 0.08f, 8, 1.5f, kLockedEdge);
-            DrawCentered("?", cx, static_cast<int>(r.y + 90), 110, {56, 51, 47, 255});
-            DrawCentered("More skins", cx, static_cast<int>(r.y + r.height - 78), 20, {110, 104, 98, 255});
-            DrawCentered("coming soon", cx, static_cast<int>(r.y + r.height - 52), 20, {110, 104, 98, 255});
+            DrawCentered("?", cx, static_cast<int>(r.y + 30), 90, {56, 51, 47, 255});
+            DrawCentered("More skins", cx, static_cast<int>(r.y + r.height - 70), 20, {110, 104, 98, 255});
+            DrawCentered("coming soon", cx, static_cast<int>(r.y + r.height - 46), 20, {110, 104, 98, 255});
             continue;
         }
 
-        const MouseSkin skin = static_cast<MouseSkin>(i);
-        const SkinInfo& info = GetSkinInfo(skin);
+        const int id = SkinIdIn(category, i);
+        const SkinInfo& info = GetSkinInfo(id);
         const bool sel = i == shopSel_;
-        const bool owned = profile_.Owns(skin);
-        const bool worn = profile_.Equipped() == skin;
+        const bool owned = profile_.Owns(id);
+        const bool worn = profile_.IsEquipped(id);
         const bool affordable = profile_.Coins() >= info.price;
 
         DrawRectangleRounded(r, 0.08f, 8, sel ? kPanelHover : kPanel);
         DrawRectangleRoundedLinesEx(r, 0.08f, 8, sel ? 3.0f : 1.5f, sel ? GOLD : (worn ? Color{90, 170, 110, 255} : Color{100, 84, 68, 255}));
-        if (worn) DrawCentered("EQUIPPED", cx, static_cast<int>(r.y + 14), 18, Color{130, 225, 150, 255});
 
-        // Showroom: the mouse trots on the spot, turning slowly so you can see the whole outfit.
-        const Rectangle stage{r.x + 16, r.y + 42, r.width - 32, 152};
+        // Showroom: the character trots on the spot, turning slowly so you can see the whole outfit.
+        const Rectangle stage{r.x + 12, r.y + 10, r.width - 24, 104};
         DrawRectangleRounded(stage, 0.12f, 8, {52, 45, 40, 255});
-        const float a = t * 0.9f + i;
-        MouseLook look;
-        look.pos = {r.x + r.width / 2, stage.y + stage.height / 2};
-        look.facing = {std::cos(a), std::sin(a)};
-        look.moving = true;
-        look.walkPhase = t * 9.0f;
-        look.scale = 2.9f;
-        look.skin = skin;
-        BeginScissorMode(static_cast<int>(stage.x), static_cast<int>(stage.y), static_cast<int>(stage.width), static_cast<int>(stage.height));
-        DrawMouseSprite(look);
-        EndScissorMode();
-
-        DrawCentered(info.name, cx, static_cast<int>(r.y + 208), 26, RAYWHITE);
-        DrawCentered(info.line1, cx, static_cast<int>(r.y + 242), 17, LIGHTGRAY);
-        DrawCentered(info.line2, cx, static_cast<int>(r.y + 264), 17, LIGHTGRAY);
-
-        const Rectangle btn{r.x + 20, r.y + r.height - 60, r.width - 40, 42};
-        if (worn)
+        const float a = t * 0.9f + i * 0.7f;
+        const Vector2 facing{std::cos(a), std::sin(a)};
+        const Vector2 mid{stage.x + stage.width / 2, stage.y + stage.height / 2};
+        BeginLogicalScissor(stage);
+        if (category == SkinCategory::Mouse)
         {
-            DrawRectangleRounded(btn, 0.35f, 8, {38, 84, 52, 255});
-            DrawCentered("Equipped", cx, static_cast<int>(btn.y + 10), 22, Color{130, 225, 150, 255});
-        }
-        else if (owned)
-        {
-            DrawRectangleRounded(btn, 0.35f, 8, sel ? Color{120, 96, 66, 255} : Color{92, 74, 56, 255});
-            DrawCentered("Equip", cx, static_cast<int>(btn.y + 10), 22, RAYWHITE);
+            MouseLook look;
+            look.pos = mid;
+            look.facing = facing;
+            look.moving = true;
+            look.walkPhase = t * 9.0f;
+            look.scale = 2.0f;
+            look.skin = static_cast<MouseSkin>(info.variant);
+            DrawMouseSprite(look);
         }
         else
         {
-            DrawRectangleRounded(btn, 0.35f, 8, affordable ? Color{112, 84, 24, 255} : Color{70, 48, 46, 255});
+            static const CatKind kinds[] = {CatKind::Tabby, CatKind::Tabby, CatKind::Sleepy, CatKind::Hunter, CatKind::Blind};
+            CatLook look;
+            look.pos = mid;
+            look.facing = facing;
+            look.kind = kinds[static_cast<int>(category)];
+            look.variant = info.variant;
+            look.moving = true;
+            look.walkPhase = t * 7.0f;
+            look.scale = 1.45f;
+            DrawCatSprite(look);
+        }
+        EndScissorMode();
+        if (worn) DrawText("EQUIPPED", static_cast<int>(stage.x + 8), static_cast<int>(stage.y + 6), 14, Color{130, 225, 150, 255});
+
+        DrawCentered(info.name, cx, static_cast<int>(r.y + 122), 22, RAYWHITE);
+        DrawCentered(info.line1, cx, static_cast<int>(r.y + 148), 15, LIGHTGRAY);
+        DrawCentered(info.line2, cx, static_cast<int>(r.y + 165), 15, LIGHTGRAY);
+
+        const Rectangle btn{r.x + 18, r.y + r.height - 34, r.width - 36, 26};
+        if (worn)
+        {
+            DrawRectangleRounded(btn, 0.4f, 8, {38, 84, 52, 255});
+            DrawCentered("Equipped", cx, static_cast<int>(btn.y + 4), 18, Color{130, 225, 150, 255});
+        }
+        else if (owned)
+        {
+            DrawRectangleRounded(btn, 0.4f, 8, sel ? Color{120, 96, 66, 255} : Color{92, 74, 56, 255});
+            DrawCentered("Equip", cx, static_cast<int>(btn.y + 4), 18, RAYWHITE);
+        }
+        else
+        {
+            DrawRectangleRounded(btn, 0.4f, 8, affordable ? Color{112, 84, 24, 255} : Color{70, 48, 46, 255});
             const char* price = TextFormat("%d", info.price);
-            const int pw = MeasureText(price, 22);
-            DrawCoin({cx - pw / 2.0f - 6, btn.y + btn.height / 2}, 11);
-            DrawText(price, cx - pw / 2 + 12, static_cast<int>(btn.y + 10), 22, affordable ? GOLD : Color{210, 120, 110, 255});
+            const int pw = MeasureText(price, 18);
+            DrawCoin({cx - pw / 2.0f - 6, btn.y + btn.height / 2}, 9);
+            DrawText(price, cx - pw / 2 + 10, static_cast<int>(btn.y + 4), 18, affordable ? GOLD : Color{210, 120, 110, 255});
         }
     }
 
@@ -645,13 +752,13 @@ void App::DrawShop() const
     {
         const int size = 22;
         const int tw = MeasureText(shopToast_.c_str(), size);
-        const Rectangle box{w / 2.0f - tw / 2.0f - 20, ShopCardTop + ShopCardH + 26.0f, tw + 40.0f, 44.0f};
+        const Rectangle box{w / 2.0f - tw / 2.0f - 20, 634.0f, tw + 40.0f, 40.0f};
         DrawRectangleRounded(box, 0.35f, 8, Fade(BLACK, 0.7f * std::min(1.0f, shopToastTimer_)));
-        DrawText(shopToast_.c_str(), static_cast<int>(box.x + 20), static_cast<int>(box.y + 11), size,
+        DrawText(shopToast_.c_str(), static_cast<int>(box.x + 20), static_cast<int>(box.y + 9), size,
                  Fade(shopToastGood_ ? Color{130, 225, 150, 255} : Color{240, 140, 120, 255}, std::min(1.0f, shopToastTimer_)));
     }
 
-    DrawCentered("Arrows or mouse to choose   -   Enter or click to buy / equip   -   Earn coins by getting cheese home", w / 2, h - 30, 18, GRAY);
+    DrawCentered("Arrows or mouse to choose   -   Enter or click to buy / equip   -   Tab or Q / E: switch category", w / 2, h - 28, 18, GRAY);
 }
 
 // ---------------------------------------------------------------- Playing
@@ -673,6 +780,7 @@ void App::UpdatePlaying()
         winRecorded_ = true;
         levels_[current_].bestTime = game_.BestTime();
         WriteSave();
+        RefreshSummary();
         profile_.AddCoins(game_.CoinsEarned());
         profile_.Save();
     }
@@ -688,7 +796,8 @@ void App::StartLevel(int index)
     const bool hasNext = !entry.isBoss && index + 1 < static_cast<int>(levels_.size());
     const bool nextIsBoss = hasNext && levels_[index + 1].isBoss;
     if (!game_.Init(entry.path, entry.bestTime, hasNext, nextIsBoss)) return;
-    game_.SetMouseSkin(profile_.Equipped());
+    game_.SetMouseSkin(profile_.MouseLook());
+    for (int k = 0; k < CatKindCount; ++k) game_.SetCatVariant(static_cast<CatKind>(k), profile_.CatVariant(static_cast<CatKind>(k)));
     current_ = index;
     winRecorded_ = false;
     screen_ = Screen::Playing;
@@ -712,8 +821,8 @@ void App::DrawBackground() const
 {
     // A dimmed checkerboard floor like the levels.
     ClearBackground({30, 27, 25, 255});
-    const int w = GetScreenWidth();
-    const int h = GetScreenHeight();
+    const int w = LogicalWidth;
+    const int h = LogicalHeight;
     for (int y = 0; y < h; y += Level::TileSize)
         for (int x = 0; x < w; x += Level::TileSize)
             if (((x + y) / Level::TileSize) % 2 == 0) DrawRectangle(x, y, Level::TileSize, Level::TileSize, {36, 32, 30, 255});

@@ -57,6 +57,49 @@ void Strand(const std::vector<Vector2>& pts, float w0, float w1, Color a, Color 
     }
 }
 
+// A five-pointed star (point-up when rot = 0).
+void Star(Vector2 c, float r, float rot, Color col)
+{
+    Vector2 pts[10];
+    for (int i = 0; i < 10; ++i)
+    {
+        const float a = rot - PI / 2 + i * PI / 5;
+        const float rr = (i % 2 == 0) ? r : r * 0.45f;
+        pts[i] = {c.x + std::cos(a) * rr, c.y + std::sin(a) * rr};
+    }
+    for (int i = 0; i < 10; ++i) Tri(c, pts[i], pts[(i + 1) % 10], col);
+}
+
+Color Mix(Color a, Color b, float t);
+
+// The sleepy cat's striped nightcap: rings seen from above, with the pompom flopping behind.
+void DrawNightcap(Vector2 hp, Vector2 f, Vector2 s, float k, float t, float tilt)
+{
+    const Color red{206, 60, 70, 255}, redDark{150, 36, 46, 255}, white{250, 246, 240, 255};
+    const Vector2 c0 = At(hp, f, s, -2.0f * k, 0);
+    // The floppy tip trails behind with a pompom, swaying, striped red and white.
+    const float sway = std::sin(t * 2.0f) * 2.0f + tilt * 10.0f;
+    std::vector<Vector2> tip;
+    for (int i = 0; i <= 9; ++i)
+    {
+        const float u = i / 9.0f;
+        tip.push_back(At(c0, f, s, (-3.0f - u * 12.0f) * k, (u * (3.0f + sway) + std::sin(u * 3.0f) * 1.5f) * k));
+    }
+    Strand(tip, 6.4f * k, 3.4f * k, red, white, 2);
+    DrawCircleV(tip.back(), 3.4f * k, Mix(white, BLACK, 0.12f));
+    DrawCircleV(At(tip.back(), f, s, -0.4f * k, -0.4f * k), 2.9f * k, white);
+    // The cap itself: a red dome with panel seams and a fluffy white brim.
+    DrawCircleV(c0, 8.4f * k, redDark);
+    DrawCircleV(c0, 7.6f * k, red);
+    for (int i = 0; i < 4; ++i)
+    {
+        const float a = i * PI / 4.0f + 0.4f;
+        DrawLineEx(At(c0, f, s, std::cos(a) * 7.0f * k, std::sin(a) * 7.0f * k), At(c0, f, s, -std::cos(a) * 7.0f * k, -std::sin(a) * 7.0f * k), 0.7f * k, Fade(redDark, 0.8f));
+    }
+    FillOval(At(c0, f, s, 1.0f * k, -2.0f * k), f, s, 3.4f * k, 2.0f * k, Fade(WHITE, 0.18f));
+    DrawRing(c0, 6.6f * k, 8.6f * k, 0, 360, 28, white);
+}
+
 Color Mix(Color a, Color b, float t)
 {
     auto ch = [t](unsigned char x, unsigned char y) { return static_cast<unsigned char>(x + (y - x) * t); };
@@ -76,12 +119,22 @@ void DrawMouseSprite(const MouseLook& m)
     const Vector2 s{-f.y, f.x};
     const Vector2 p = m.pos;
     const float t = static_cast<float>(GetTime());
+    const MouseSkin skin = m.skin;
+    const bool aviator = skin == MouseSkin::Aviator;
+    const bool pirate = skin == MouseSkin::Pirate;
+    const bool chef = skin == MouseSkin::Chef;
+    const bool wizard = skin == MouseSkin::Wizard;
+    const bool ninja = skin == MouseSkin::Ninja;
+    const bool golden = skin == MouseSkin::Golden;
 
-    const bool aviator = m.skin == MouseSkin::Aviator;
-    // Aviator: a slate-blue coat instead of the classic grey.
-    const Color body = m.flashRed ? Color{232, 70, 58, 255} : (aviator ? Color{116, 140, 178, 255} : Color{172, 172, 186, 255});
-    const Color light = m.flashRed ? Color{255, 130, 115, 255} : (aviator ? Color{164, 186, 216, 255} : Color{210, 210, 222, 255});
-    const Color dark = m.flashRed ? Color{170, 40, 36, 255} : (aviator ? Color{80, 98, 134, 255} : Color{130, 130, 146, 255});
+    // Coat colors by skin.
+    Color body{172, 172, 186, 255}, light{210, 210, 222, 255}, dark{130, 130, 146, 255};
+    if (aviator) { body = {116, 140, 178, 255}; light = {164, 186, 216, 255}; dark = {80, 98, 134, 255}; }
+    if (chef)    { body = {238, 234, 228, 255}; light = {252, 250, 246, 255}; dark = {196, 190, 182, 255}; }
+    if (wizard)  { body = {170, 160, 200, 255}; light = {208, 200, 230, 255}; dark = {122, 110, 160, 255}; }
+    if (ninja)   { body = {68, 72, 96, 255};    light = {102, 108, 136, 255}; dark = {42, 46, 64, 255}; }
+    if (golden)  { body = {238, 192, 60, 255};  light = {255, 230, 130, 255}; dark = {184, 134, 30, 255}; }
+    if (m.flashRed) { body = {232, 70, 58, 255}; light = {255, 130, 115, 255}; dark = {170, 40, 36, 255}; }
 
     // Shadow
     FillOval({p.x + 2 * k, p.y + 3 * k}, f, s, 15 * k, 11 * k, Fade(BLACK, 0.25f));
@@ -94,14 +147,15 @@ void DrawMouseSprite(const MouseLook& m)
         const float wave = std::sin(t * (m.moving ? 10.0f : 3.0f) - u * 4.0f) * (m.moving ? 5.0f : 3.0f) * u;
         tail.push_back(At(p, f, s, (-11.0f - u * 26.0f) * k, wave * k));
     }
-    Strand(tail, 3.2f * k, 1.0f * k, kPink);
+    Strand(tail, 3.2f * k, 1.0f * k, ninja ? Color{120, 84, 100, 255} : kPink);
 
     // Feet step while walking.
     const float step = m.moving ? std::sin(m.walkPhase) * 3.0f : 0.0f;
-    DrawCircleV(At(p, f, s, (7 + step) * k, 8.5f * k), 2.7f * k, kPink);
-    DrawCircleV(At(p, f, s, (7 - step) * k, -8.5f * k), 2.7f * k, kPink);
-    DrawCircleV(At(p, f, s, (-7 - step) * k, 8.5f * k), 3.0f * k, kPink);
-    DrawCircleV(At(p, f, s, (-7 + step) * k, -8.5f * k), 3.0f * k, kPink);
+    const Color foot = ninja ? Color{120, 84, 100, 255} : kPink;
+    DrawCircleV(At(p, f, s, (7 + step) * k, 8.5f * k), 2.7f * k, foot);
+    DrawCircleV(At(p, f, s, (7 - step) * k, -8.5f * k), 2.7f * k, foot);
+    DrawCircleV(At(p, f, s, (-7 - step) * k, 8.5f * k), 3.0f * k, foot);
+    DrawCircleV(At(p, f, s, (-7 + step) * k, -8.5f * k), 3.0f * k, foot);
 
     // Body with a soft darker rim and a highlight along the back.
     FillOval(At(p, f, s, -2 * k, 0), f, s, 13.5f * k, 10.5f * k, dark);
@@ -114,10 +168,15 @@ void DrawMouseSprite(const MouseLook& m)
         const Vector2 e = At(p, f, s, 6 * k, sg * 8.5f * k);
         DrawCircleV(e, 6.5f * k, dark);
         DrawCircleV(e, 5.5f * k, body);
-        DrawCircleV(At(e, f, s, 0.8f * k, 0), 3.6f * k, kPink);
+        DrawCircleV(At(e, f, s, 0.8f * k, 0), 3.6f * k, ninja ? Color{150, 100, 120, 255} : kPink);
+    }
+    if (pirate) // a gold hoop earring
+    {
+        const Vector2 e = At(p, f, s, 3.4f * k, 13.6f * k);
+        DrawRing(e, 1.5f * k, 2.4f * k, 0, 360, 16, Color{236, 190, 50, 255});
     }
 
-    // Aviator scarf: a red band round the neck with two ends streaming out behind.
+    // Neckwear: aviator scarf, chef's neckerchief.
     if (aviator)
     {
         const Color red{206, 52, 62, 255}, redDark{140, 30, 42, 255}, cream{246, 226, 196, 255};
@@ -141,12 +200,20 @@ void DrawMouseSprite(const MouseLook& m)
         FillOval(At(p, f, s, 3.0f * k, 0), f, s, 3.4f * k, 9.6f * k, redDark);
         FillOval(At(p, f, s, 3.3f * k, 0), f, s, 2.6f * k, 8.6f * k, red);
     }
+    if (chef)
+    {
+        const Color red{206, 52, 62, 255}, redDark{150, 34, 44, 255};
+        FillOval(At(p, f, s, 3.4f * k, 0), f, s, 3.4f * k, 9.0f * k, redDark);
+        FillOval(At(p, f, s, 3.6f * k, 0), f, s, 2.6f * k, 8.0f * k, red);
+        Tri(At(p, f, s, 5.4f * k, -1.6f * k), At(p, f, s, 5.4f * k, 1.6f * k), At(p, f, s, 9.5f * k, 0), red); // knot
+    }
 
     // Head and snout
     DrawCircleV(At(p, f, s, 9 * k, 0), 8.0f * k, body);
     FillOval(At(p, f, s, 14 * k, 0), f, s, 6.5f * k, 4.6f * k, light);
+    if (ninja) FillOval(At(p, f, s, 13.4f * k, 0), f, s, 6.6f * k, 6.2f * k, Color{34, 36, 52, 255}); // face mask
 
-    // Aviator cap: brown leather with a seam, worn over the back of the head (the ears stay out).
+    // Headgear (drawn over the back of the head; the eyes are drawn on top).
     if (aviator)
     {
         const Color leather{128, 80, 46, 255}, leatherLight{166, 108, 64, 255}, leatherDark{86, 52, 30, 255};
@@ -154,8 +221,84 @@ void DrawMouseSprite(const MouseLook& m)
         DrawCircleV(At(p, f, s, 6.2f * k, 0), 5.8f * k, leather);
         FillOval(At(p, f, s, 5.0f * k, -1.4f * k), f, s, 3.4f * k, 2.4f * k, leatherLight);
         DrawLineEx(At(p, f, s, 1.2f * k, 0), At(p, f, s, 11.4f * k, 0), 0.8f * k, leatherDark);
-        // Goggle strap round the head.
-        DrawLineEx(At(p, f, s, 10.0f * k, -7.6f * k), At(p, f, s, 10.0f * k, 7.6f * k), 1.6f * k, Color{48, 34, 28, 255});
+        DrawLineEx(At(p, f, s, 10.0f * k, -7.6f * k), At(p, f, s, 10.0f * k, 7.6f * k), 1.6f * k, Color{48, 34, 28, 255}); // goggle strap
+    }
+    if (pirate)
+    {
+        const Color red{200, 40, 48, 255}, redDark{140, 24, 32, 255};
+        const float sway = std::sin(t * (m.moving ? 10.0f : 3.0f)) * (m.moving ? 3.0f : 1.0f);
+        for (int end = 0; end < 2; ++end)
+        {
+            const float sg = end == 0 ? 1.0f : -1.0f;
+            std::vector<Vector2> pts;
+            for (int i = 0; i <= 5; ++i)
+            {
+                const float u = i / 5.0f;
+                pts.push_back(At(p, f, s, (1.0f - u * 11.0f) * k, (sg * (1.5f + u * 3.0f) + sway * u * sg) * k));
+            }
+            Strand(pts, 3.6f * k, 2.0f * k, redDark);
+            Strand(pts, 2.6f * k, 1.2f * k, red);
+        }
+        DrawCircleV(At(p, f, s, 6.2f * k, 0), 6.6f * k, redDark);
+        DrawCircleV(At(p, f, s, 6.0f * k, 0), 5.8f * k, red);
+        for (auto d : {std::pair{4.0f, 2.4f}, std::pair{6.8f, -2.6f}, std::pair{2.2f, -2.4f}, std::pair{8.4f, 1.8f}})
+            DrawCircleV(At(p, f, s, d.first * k, d.second * k), 0.9f * k, Fade(WHITE, 0.9f));
+    }
+    if (chef)
+    {
+        // A puffy toque seen from above: a ring of puffs round a big center puff.
+        const Color puff{252, 252, 252, 255}, shade{204, 204, 212, 255};
+        const Vector2 c0 = At(p, f, s, 5.6f * k, 0);
+        for (int i = 0; i < 7; ++i)
+        {
+            const float a = i * 2.0f * PI / 7.0f + 0.3f;
+            const Vector2 q = At(c0, f, s, std::cos(a) * 5.4f * k, std::sin(a) * 5.4f * k);
+            DrawCircleV(q, 4.2f * k, shade);
+            DrawCircleV(At(q, f, s, -0.3f * k, -0.3f * k), 3.7f * k, puff);
+        }
+        DrawCircleV(c0, 5.6f * k, shade);
+        DrawCircleV(At(c0, f, s, -0.4f * k, -0.4f * k), 5.0f * k, puff);
+        for (int i = 0; i < 3; ++i) DrawLineEx(At(c0, f, s, -2.0f * k, (i - 1) * 2.4f * k), At(c0, f, s, 2.6f * k, (i - 1) * 2.0f * k), 0.6f * k, Fade(shade, 0.8f));
+    }
+    if (wizard)
+    {
+        const Color brim{56, 42, 108, 255}, crown{92, 70, 160, 255}, crownLight{128, 104, 196, 255}, gold{240, 200, 70, 255};
+        const Vector2 c0 = At(p, f, s, 4.6f * k, 0);
+        DrawCircleV(c0, 10.0f * k, brim);
+        DrawCircleV(At(c0, f, s, 0.3f * k, 0), 9.0f * k, Color{74, 56, 132, 255});
+        DrawCircleV(c0, 5.6f * k, crown);
+        DrawRing(c0, 4.6f * k, 5.6f * k, 0, 360, 24, gold);
+        // The tip flops back over the brim.
+        const Vector2 tipMid = At(c0, f, s, -3.5f * k, 1.6f * k), tipEnd = At(c0, f, s, -8.0f * k, 3.6f * k);
+        DrawLineEx(c0, tipMid, 4.2f * k, crown);
+        DrawLineEx(tipMid, tipEnd, 2.4f * k, crown);
+        DrawCircleV(tipEnd, 1.3f * k, gold);
+        FillOval(At(c0, f, s, 1.4f * k, -1.6f * k), f, s, 2.6f * k, 1.6f * k, crownLight);
+        Star(At(c0, f, s, 9.0f * k, 0), 2.6f * k, 0.3f, gold);
+        Star(At(c0, f, s, 4.0f * k, 6.6f * k), 1.6f * k, 0.9f, Fade(gold, 0.9f));
+        Star(At(c0, f, s, 5.0f * k, -6.6f * k), 1.4f * k, 0.2f, Fade(gold, 0.9f));
+    }
+    if (ninja)
+    {
+        const Color band{206, 44, 52, 255}, bandDark{140, 28, 36, 255};
+        const float speed = m.moving ? 12.0f : 3.5f;
+        const float amp = m.moving ? 4.5f : 1.6f;
+        for (int end = 0; end < 2; ++end)
+        {
+            const float sg = end == 0 ? 1.0f : -1.0f;
+            std::vector<Vector2> pts;
+            for (int i = 0; i <= 8; ++i)
+            {
+                const float u = i / 8.0f;
+                const float wave = std::sin(t * speed - u * 4.0f + end * 1.3f) * amp * u;
+                pts.push_back(At(p, f, s, (5.0f - u * (m.moving ? 20.0f : 13.0f)) * k, (sg * (1.5f + u * 2.0f) + wave) * k));
+            }
+            Strand(pts, 3.4f * k, 1.6f * k, bandDark);
+            Strand(pts, 2.4f * k, 1.0f * k, band);
+        }
+        DrawLineEx(At(p, f, s, 8.0f * k, -8.0f * k), At(p, f, s, 8.0f * k, 8.0f * k), 3.6f * k, bandDark);
+        DrawLineEx(At(p, f, s, 8.0f * k, -7.6f * k), At(p, f, s, 8.0f * k, 7.6f * k), 2.6f * k, band);
+        FillOval(At(p, f, s, 8.0f * k, 0), f, s, 2.0f * k, 2.0f * k, Color{200, 204, 214, 255}); // metal plate
     }
 
     // Eyes with a glint
@@ -171,16 +314,43 @@ void DrawMouseSprite(const MouseLook& m)
             DrawCircleV(At(e, f, s, -0.8f * k, -1.2f * k), 0.9f * k, Fade(WHITE, 0.85f));
             continue;
         }
+        if (pirate && sg < 0)
+        {
+            // Eyepatch (with a strap up and over the head).
+            DrawLineEx(e, At(p, f, s, 7.0f * k, 6.6f * k), 0.9f * k, Color{30, 26, 30, 255});
+            DrawLineEx(e, At(p, f, s, 8.0f * k, -7.8f * k), 0.9f * k, Color{30, 26, 30, 255});
+            DrawCircleV(e, 3.5f * k, Color{26, 24, 28, 255});
+            DrawCircleV(At(e, f, s, -0.7f * k, -0.7f * k), 1.0f * k, Fade(WHITE, 0.25f));
+            continue;
+        }
+        if (ninja)
+        {
+            DrawCircleV(e, 3.0f * k, Color{240, 240, 246, 255});
+            DrawCircleV(At(e, f, s, 0.6f * k, 0), 1.7f * k, Color{20, 20, 28, 255});
+            DrawCircleV(At(e, f, s, 0.0f, -0.8f * k), 0.6f * k, WHITE);
+            continue;
+        }
         DrawCircleV(e, 2.0f * k, Color{24, 22, 30, 255});
         DrawCircleV(At(e, f, s, 0.5f * k, -0.6f * k), 0.75f * k, WHITE);
     }
     if (aviator) DrawLineEx(At(p, f, s, 12.0f * k, -1.2f * k), At(p, f, s, 12.0f * k, 1.2f * k), 1.4f * k, Color{176, 136, 48, 255}); // goggle bridge
 
     // Nose and whiskers
-    DrawCircleV(At(p, f, s, 19.8f * k, 0), 2.3f * k, kPinkDark);
+    if (!ninja) DrawCircleV(At(p, f, s, 19.8f * k, 0), 2.3f * k, kPinkDark);
     for (float sg : {1.0f, -1.0f})
         for (int j = -1; j <= 1; ++j)
-            DrawLineEx(At(p, f, s, 17 * k, sg * 2.0f * k), At(p, f, s, (18.0f + j * 3.5f) * k, sg * 11.0f * k), 0.8f * k, Fade(WHITE, 0.65f));
+            DrawLineEx(At(p, f, s, 17 * k, sg * 2.0f * k), At(p, f, s, (18.0f + j * 3.5f) * k, sg * 11.0f * k), 0.8f * k, Fade(WHITE, ninja ? 0.4f : 0.65f));
+
+    // Golden Mouse: twinkling sparkles all around.
+    if (golden)
+        for (int i = 0; i < 5; ++i)
+        {
+            const float a = t * 0.9f + i * 2.0f * PI / 5.0f;
+            const float r = (17.0f + 3.0f * std::sin(t * 3.0f + i * 1.9f)) * k;
+            const float twinkle = 0.5f + 0.5f * std::sin(t * 6.0f + i * 2.3f);
+            const Vector2 q{p.x + std::cos(a) * r, p.y + std::sin(a) * r};
+            Star(q, (1.6f + 1.6f * twinkle) * k, a, Fade(WHITE, 0.55f + 0.4f * twinkle));
+        }
 }
 
 // ------------------------------------------------------------------ cats
@@ -196,10 +366,18 @@ void DrawCatSprite(const CatLook& c)
 
     Color fur = st.fur;
     Color dark = st.furDark;
+    Color eyeColor = st.eye;
+    Color siamesePoints{78, 58, 48, 255};
+    const int variant = c.variant;
+    // Shop coats (recolors). Accessories are drawn further down.
+    if (c.kind == CatKind::Tabby && variant == 1) { fur = {58, 56, 70, 255}; dark = {26, 24, 34, 255}; }           // Midnight
+    if (c.kind == CatKind::Sleepy && variant == 1) { fur = {248, 240, 226, 255}; dark = {212, 196, 172, 255}; }    // Cream Puff
+    if (c.kind == CatKind::Hunter && variant == 1) { fur = {214, 186, 150, 255}; dark = {180, 150, 120, 255}; siamesePoints = {56, 36, 30, 255}; } // Chocolate Point
+    if (c.kind == CatKind::Blind && variant == 1) { fur = {242, 246, 252, 255}; dark = {188, 200, 218, 255}; }     // Snowy
     const bool siamese = c.kind == CatKind::Hunter;
     const bool boss = c.kind == CatKind::Boss;
     const Color tuxWhite{236, 234, 228, 255};
-    const Color points = siamese ? Color{78, 58, 48, 255} : dark; // Siamese: dark ears, face, paws, tail
+    const Color points = siamese ? siamesePoints : dark; // Siamese: dark ears, face, paws, tail
     const Color innerEar{222, 150, 150, 255};
     const Color belly = Mix(fur, WHITE, 0.3f);
 
@@ -239,6 +417,7 @@ void DrawCatSprite(const CatLook& c)
             DrawLineEx(At(e, f, s, 0, -1.8f * k), At(e, f, s, 0.8f * k, 1.8f * k), 1.3f * k, Mix(dark, BLACK, 0.4f));
         }
         DrawCircleV(At(hp, f, s, 6 * k, 0), 1.6f * k, kPinkDark);
+        if (c.kind == CatKind::Sleepy && variant == 2) DrawNightcap(hp, f, s, k, t, 0.0f);
         return;
     }
 
@@ -285,6 +464,11 @@ void DrawCatSprite(const CatLook& c)
             const float along = -4.0f + i * 6.0f;
             const float half = 9.0f * std::sqrt(std::max(0.0f, 1.0f - (i * 6.0f / 17.0f) * (i * 6.0f / 17.0f)));
             DrawLineEx(At(p, f, s, along * k * stretch, -half * k * squash), At(p, f, s, (along + 1.5f) * k * stretch, half * k * squash), 2.6f * k, Fade(dark, 0.85f));
+        }
+        if (variant == 1) // Midnight: a blue collar with a gold tag
+        {
+            DrawLineEx(At(p, f, s, 8 * k * stretch, -8.5f * k), At(p, f, s, 8 * k * stretch, 8.5f * k), 3.0f * k, Color{60, 120, 224, 255});
+            DrawCircleV(At(p, f, s, 9.4f * k * stretch, 1.2f * k), 1.9f * k, GOLD);
         }
         break;
     case CatKind::Hunter: // darker toward the hindquarters
@@ -345,6 +529,45 @@ void DrawCatSprite(const CatLook& c)
         }
     }
 
+    // Shop accessories that sit on top of the head (the eyes are drawn over them).
+    {
+        const float tilt = c.pose == CatPose::Stunned ? 0.35f : 0.0f;
+        if (c.kind == CatKind::Tabby && variant == 2) // Dapper: a black top hat with a red band
+        {
+            const Vector2 hc = At(hp, f, s, -4.0f * k, 0);
+            auto pt = [&](float x, float y) { return Vector2Add(hc, Rotate({x, y}, tilt)); };
+            const Vector2 c0 = pt(0, 0);
+            DrawCircleV(c0, 9.2f * k, Color{16, 16, 20, 255});
+            DrawCircleV(c0, 8.4f * k, Color{34, 34, 42, 255});
+            DrawCircleV(c0, 5.6f * k, Color{22, 22, 28, 255});
+            DrawRing(c0, 4.6f * k, 5.6f * k, 0, 360, 24, Color{190, 34, 44, 255});
+            DrawCircleV(pt(-0.6f * k, -0.6f * k), 4.2f * k, Color{48, 48, 58, 255});
+            FillOval(pt(-1.4f * k, -1.6f * k), f, s, 2.4f * k, 1.2f * k, Fade(WHITE, 0.25f));
+        }
+        if (c.kind == CatKind::Sleepy && variant == 2) DrawNightcap(hp, f, s, k, t, tilt);
+        if (c.kind == CatKind::Hunter && variant == 2) // Ninja: a navy headband with streaming tails
+        {
+            const Color band{30, 38, 84, 255}, bandLight{64, 76, 140, 255};
+            const float speed = c.moving ? 12.0f : 3.0f;
+            const float amp = c.moving ? 5.0f : 1.5f;
+            for (int end = 0; end < 2; ++end)
+            {
+                const float sg = end == 0 ? 1.0f : -1.0f;
+                std::vector<Vector2> pts;
+                for (int i = 0; i <= 8; ++i)
+                {
+                    const float u = i / 8.0f;
+                    const float wave = std::sin(t * speed - u * 4.0f + end * 1.3f) * amp * u;
+                    pts.push_back(At(hp, f, s, (-3.0f - u * (c.moving ? 20.0f : 14.0f)) * k, (sg * (1.8f + u * 2.4f) + wave) * k));
+                }
+                Strand(pts, 3.6f * k, 1.8f * k, band);
+            }
+            DrawLineEx(At(hp, f, s, -2.4f * k, -10.2f * k), At(hp, f, s, -2.4f * k, 10.2f * k), 3.8f * k, band);
+            DrawLineEx(At(hp, f, s, -2.0f * k, -9.8f * k), At(hp, f, s, -2.0f * k, 9.8f * k), 1.0f * k, bandLight);
+            FillOval(At(hp, f, s, -2.4f * k, 0), f, s, 2.2f * k, 2.2f * k, Color{204, 208, 220, 255}); // metal plate
+        }
+    }
+
     // Eyes
     for (float sg : {1.0f, -1.0f})
     {
@@ -362,13 +585,27 @@ void DrawCatSprite(const CatLook& c)
             continue;
         }
         DrawCircleV(e, 3.3f * k, Color{20, 18, 20, 255});
-        DrawCircleV(e, 2.8f * k, st.eye);
+        DrawCircleV(e, 2.8f * k, eyeColor);
         const bool wide = c.alert || c.pose == CatPose::WindUp || c.pose == CatPose::Lunge;
         if (wide)
             DrawCircleV(e, 2.0f * k, Color{15, 12, 15, 255});
         else
             DrawLineEx(At(e, f, s, -2.2f * k, 0), At(e, f, s, 2.2f * k, 0), 1.2f * k, Color{15, 12, 15, 255}); // slit
         DrawCircleV(At(e, f, s, 0.9f * k, -0.9f * k), 0.8f * k, WHITE);
+    }
+
+    if (c.kind == CatKind::Blind && variant == 2) // Cool Shades
+    {
+        const Color lens{16, 16, 22, 255};
+        for (float sg : {1.0f, -1.0f})
+        {
+            const Vector2 e = At(hp, f, s, 3.4f * k, sg * 4.8f * k);
+            FillOval(e, f, s, 3.4f * k, 4.6f * k, Color{60, 60, 70, 255});
+            FillOval(e, f, s, 2.8f * k, 4.0f * k, lens);
+            DrawLineEx(At(e, f, s, 1.2f * k, -2.0f * k), At(e, f, s, -0.6f * k, -0.2f * k), 0.9f * k, Fade(WHITE, 0.5f));
+            DrawLineEx(At(e, f, s, -1.2f * k, sg * 4.0f * k), At(hp, f, s, -6.0f * k, sg * 9.4f * k), 0.9f * k, Color{60, 60, 70, 255}); // arm
+        }
+        DrawLineEx(At(hp, f, s, 3.4f * k, -1.2f * k), At(hp, f, s, 3.4f * k, 1.2f * k), 1.0f * k, Color{60, 60, 70, 255});
     }
 
     // Nose and whiskers
