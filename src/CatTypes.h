@@ -4,9 +4,9 @@
 
 #include "raylib.h"
 
-enum class CatKind { Tabby, Sleepy, Hunter, Blind };
+enum class CatKind { Tabby, Sleepy, Hunter, Blind, Boss };
 
-constexpr int CatKindCount = 4;
+constexpr int CatKindCount = 5;
 
 // Everything that makes one kind of cat play differently from another.
 struct CatStats
@@ -22,9 +22,17 @@ struct CatStats
     Color fur;
     Color furDark;
     Color eye;
+    // Body size and pounce
+    float radius;        // collision radius in pixels (normal cats 16)
+    float lungeRange;    // starts a pounce when the mouse is this close and in sight
+    float lungeDistance; // how far a pounce travels
+    float lungeSpeed;    // pixels per second while pouncing
+    float windUpTime;    // crouch before the pounce (the player's warning)
+    float stunTime;      // seconds dazed after pouncing into a wall or furniture
+    bool boss;           // takes hits instead of just getting dazed
 };
 
 const CatStats& GetCatStats(CatKind kind);
 
-// Parses "tabby", "sleepy", "hunter" or "blind". Returns false if the text isn't a cat type.
+// Parses "tabby", "sleepy", "hunter", "blind" or "boss". Returns false if the text isn't a cat type.
 bool ParseCatKind(const std::string& text, CatKind& out);

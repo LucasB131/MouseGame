@@ -4,9 +4,13 @@ A top-down stealth game written in C++20 with [raylib](https://www.raylib.com/).
 Sneak a mouse past patrolling cats, carry the cheese home, and reach the exit without getting pounced on.
 
 ![Gameplay](docs/gameplay.png)
+![Characters and cheeses](docs/sprites.png)
 ![All 25 rooms of World 1](docs/rooms.png)
 ![World select](docs/menu.png)
 ![Level select](docs/levels.png)
+![The secret boss slot](docs/boss_slot.png)
+![Sir Pounce, the World 1 boss](docs/boss_fight.png)
+![The shop](docs/shop.png)
 
 ## Features
 
@@ -23,13 +27,26 @@ Sneak a mouse past patrolling cats, carry the cheese home, and reach the exit wi
   - **Sleepy**: slow and short-sighted, naps on a cycle; sneak past while it snoozes
   - **Hunter**: fast, long narrow vision cone
   - **Blind**: senses in a full circle around it, but only up close
+- **Secret boss**: clear all 25 levels and a `?` door on the level select opens to **Sir Pounce's Throne Room**.
+  Sir Pounce is a huge tuxedo cat with a crown who pounces from far away. A red lane shows where he will leap, and
+  it locks in a moment before he does. Trick him into crashing into a pillar or table **3 times** to knock him out,
+  grab the **Golden Cheese** he drops, and escape through the exit. Beating him unlocks World 2 (not built yet)
+- **Shop and coins**: cheese you bring home earns coins (Gouda is worth 2, the Golden Cheese 25), plus a bonus the
+  first time you clear a level (10, or 50 for the boss). Spend them in the shop (press **S** on the world select).
+  The first skin is the **Ace Aviator** mouse: slate-blue coat, leather cap, brass goggles and a red scarf that
+  streams behind. Coins, owned skins and the equipped skin are saved in `profile.txt`
 - **Lunges**: a cat that gets close crouches for a split second, then pounces. A hit catches you. A miss means it
   keeps chasing if it can still see you, or gives up and searches. Pouncing into a wall leaves it dazed with spinning
   stars, unable to see or move
 - **Vision cones blocked by walls**, built by raycasting through the tile grid
 - **Cat AI**: a finite-state machine (patrol, investigate, search, return, wind-up, lunge, stunned) with
   **A\* pathfinding** to the mouse's last known position
-- **Cheese trail**: picked-up cheese follows behind the mouse and slows it down (7% each, down to 55% speed)
+- **Detailed code-drawn characters**: the mouse (walking feet, swaying tail, whiskers) and four cat breeds, each with
+  its own coat (striped tabby, fluffy sleepy cat, Siamese hunter with dark points, cloudy-eyed blind cat), animated
+  paws and tail, slit pupils that go wide when chasing, and poses for sleeping, crouching, pouncing and being dazed
+- **Five cheeses**: Cheddar, Swiss, Brie and Blue wedges, plus the heavy **Gouda wheel**, which slows you down twice
+  as much as a normal piece
+- **Cheese trail**: picked-up cheese follows behind the mouse and slows it down (7% per unit of weight, down to 55%)
 - **Color-coded mouse holes**: hide from cats, store your cheese, and travel to the matching hole
 - **Red peppers**: a 5-second, +50% speed boost. The mouse flashes red, and the flashing slows down as the boost
   runs out
@@ -55,7 +72,8 @@ raylib is downloaded automatically by CMake on the first configure.
 |-----|--------|
 | WASD / Arrows | Move (and navigate menus) |
 | Space | Skip intro / in a mouse hole: travel to the matching hole |
-| Enter or click | Choose a world or level / next level after winning |
+| Enter or click | Choose a world or level / next level after winning / buy or equip in the shop |
+| S | Open the shop (on the world select) |
 | R | Restart level |
 | Esc | Back (level -> level select -> world select -> quit) |
 | F1 | Debug view: A* paths, lunge range, last known position |
@@ -87,17 +105,22 @@ Each cat runs a state machine:
 A cat senses the mouse if it's within range, inside its cone (blind cats: any direction), and a ray from the cat to
 the mouse doesn't hit a wall. Cat stats live in one table in `src/CatTypes.cpp`; lunge timings are in `src/Cat.h`.
 
+**Sir Pounce** (`cat boss`) uses the same machine with a bigger body, a longer lunge and a wind-up that visibly
+locks its aim (`BossAimLock` in `src/Cat.h`). Each wall crash is one hit, and after `BossHitsToWin` (3) he goes to
+the `KnockedOut` state for good. Every hit makes him chase faster and crouch for less time.
+
 ## Level format
 
 Levels live in `assets/levels/level1.txt`, `level2.txt`, and so on. The game loads them in order until a number is
-missing. One character per 40x40 tile:
+missing. The secret boss level is `assets/levels/boss1.txt` (it only appears once all 25 are loaded). One character per 40x40 tile:
 
 | Char | Meaning |
 |------|---------|
 | `#` | Wall |
 | `.` | Floor |
 | `P` | Player start |
-| `C` | Cheese |
+| `C` | Cheese (Cheddar, Swiss, Brie or Blue, picked from its position) |
+| `O` | Gouda wheel: heavy, counts double for slowdown |
 | `E` | Exit (usable once every piece of cheese has been picked up) |
 | `1`-`4` | Mouse hole; two holes with the same digit are a linked pair (red, blue, purple, teal) |
 | `R` | Red pepper (speed boost) |
@@ -121,22 +144,28 @@ cat sleepy 24,7
 `name` sets the title shown on the level select. `room` picks the theme (`foyer`, `living`, `dining`, `hallway`,
 `kitchen`, `pantry`, `library`, `billiards`, `study`, `music`, `conservatory`, `laundry`, `bathroom`, `bedroom`,
 `nursery`, `gameroom`, `theater`, `cellar`, `garage`, `basement`, `attic`, `ballroom`, `gallery`, `parlor`).
-`rug x,y w,h color` adds a walkable rug (`red`, `blue`, `green`, `gold`, `purple`, `teal`, `cream`). Each `cat` line gives a type and patrol waypoints in tile
+`rug x,y w,h color` adds a walkable rug (`red`, `blue`, `green`, `gold`, `purple`, `teal`, `cream`). Each `cat` line (`tabby`, `sleepy`, `hunter`, `blind` or `boss`) gives a type and patrol waypoints in tile
 coordinates. The cat walks them forward, then back. Consecutive waypoints need a clear straight path (the game logs
 a warning otherwise). A cat with one waypoint stays put: sleepy cats nap there, others slowly turn in place.
 
 All 25 levels were checked with an automated solver that runs the real cat code, models the cheese slowdown and
-mouse holes, and confirms each level can be beaten without ever being seen.
+mouse holes, and confirms each level can be beaten without ever being seen. The boss fight was checked with a bot
+that plays with real key presses: it wins without being caught, even when it reacts 0.3 s late, and a player who never
+dodges gets caught.
 
 ## Code layout
 
 - `src/main.cpp`: window setup and main loop
-- `src/App.*`: intro, world select, level select, screen flow, saving best times
+- `src/App.*`: intro, world select, level select, shop, screen flow, saving best times
 - `src/Game.*`: one level in play: cheese carrying/storing, mouse holes, catching, timer, win/lose, HUD
 - `src/Level.*`: loads the tile grid, furniture, rugs and room theme; raycasting / line of sight / wall overlap
 - `src/RoomRenderer.*`: draws each room (floors, rugs, walls, shadows, furniture art) once into a cached texture
 - `src/RoomTheme.*`: floor style and color palette for each room type
 - `src/Player.*`: movement and circle-vs-tile collision
+- `src/Sprites.*`: code-drawn mouse, cat and cheese art (shared by the game and the menus)
+- `src/Cheese.*`: cheese kinds, their weights and coin values
+- `src/Skins.*`: the skin catalog (names, descriptions, prices)
+- `src/Profile.*`: coins, owned skins and the equipped skin, saved to `profile.txt`
 - `src/CheeseTrail.*`: position history that carried cheese follows
 - `src/Cat.*`: cat behavior state machine, lunging, stuns, napping, vision drawing
 - `src/CatTypes.*`: stats for each cat type
@@ -151,7 +180,11 @@ mouse holes, and confirms each level can be beaten without ever being seen.
 - [x] Mouse holes (hide + teleport), cheese trail with slowdown and storing, dotted patrol paths
 - [x] Intro, world select, 25-slot level select, 10 levels, sequential unlocking
 - [x] Red pepper speed boost
+- [x] World 1 secret boss (Sir Pounce) that unlocks World 2
+- [x] Shop with coins and a first mouse skin
+- [ ] More skins (mouse and cat) and a shop tab for each
 - [ ] Lives and respawning at the last mouse hole
-- [ ] Sprites and sound effects
+- [x] Detailed character art and five cheese types
+- [ ] Sound effects and music
 - [x] World 1: 25 themed house rooms with furniture
-- [ ] Worlds 2-5
+- [ ] World 2 (The Garden) and Worlds 3-5

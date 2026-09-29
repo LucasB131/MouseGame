@@ -68,6 +68,7 @@ bool Level::LoadFromFile(const std::string& path)
     rugs_.clear();
     theme_ = RoomTheme::Living;
     cheeseSpawns_.clear();
+    cheeseKinds_.clear();
     pepperSpawns_.clear();
     cats_.clear();
     holes_.clear();
@@ -84,7 +85,16 @@ bool Level::LoadFromFile(const std::string& path)
             case '#': tile = Tile::Wall; break;
             case 'E': tile = Tile::Exit; break;
             case 'P': tile = Tile::Floor; playerStart_ = TileCenter(x, y); break;
-            case 'C': tile = Tile::Floor; cheeseSpawns_.push_back(TileCenter(x, y)); break;
+            case 'C':
+                tile = Tile::Floor;
+                cheeseSpawns_.push_back(TileCenter(x, y));
+                cheeseKinds_.push_back(LightCheeseAt(x, y));
+                break;
+            case 'O':
+                tile = Tile::Floor;
+                cheeseSpawns_.push_back(TileCenter(x, y));
+                cheeseKinds_.push_back(CheeseKind::Gouda);
+                break;
             case 'R': tile = Tile::Floor; pepperSpawns_.push_back(TileCenter(x, y)); break;
             case '1': case '2': case '3': case '4':
                 tile = Tile::Hole;

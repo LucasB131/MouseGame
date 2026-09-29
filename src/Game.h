@@ -8,6 +8,7 @@
 #include "Level.h"
 #include "Player.h"
 #include "RoomRenderer.h"
+#include "Skins.h"
 
 // "1:05.3" style time string.
 std::string FormatTime(float seconds);
@@ -18,11 +19,15 @@ class Game
 {
 public:
     // bestTime < 0 means the level hasn't been completed yet.
-    bool Init(const std::string& levelPath, float bestTime, bool hasNextLevel);
+    // nextIsBoss: the level after this one is the world's boss (changes the "next level" prompt).
+    bool Init(const std::string& levelPath, float bestTime, bool hasNextLevel, bool nextIsBoss = false);
     void Update(float dt);
     void Draw() const;
 
     bool IsWon() const { return state_ == State::Won; }
+    void SetMouseSkin(MouseSkin skin) { skin_ = skin; }
+    // Coins for this win: the cheese you got home, plus a bonus the first time the level is cleared.
+    int CoinsEarned() const { return storedCoins_ + (firstClear_ ? (bossIndex_ >= 0 ? BossClearBonus : ClearBonus) : 0); }
     float BestTime() const { return bestTime_; }
 
 private:
@@ -34,11 +39,17 @@ private:
     void EnterHole(int index);
     void StoreCheese(Vector2 where);
     bool IsFlashingRed() const;
-    bool AllCheeseFound() const { return cheese_.empty(); }
+    // The exit opens once every piece of cheese is picked up (and, on a boss level, the boss is out cold
+    // and its Golden Cheese has been grabbed).
+    bool AllCheeseFound() const { return cheese_.empty() && (bossIndex_ < 0 || goldenDropped_); }
+    void UpdateBoss();
+    void DrawBossHud() const;
     bool IsHidden() const { return hiddenIn_ >= 0; }
 
+    static constexpr int ClearBonus = 10;      // coins the first time a level is beaten
+    static constexpr int BossClearBonus = 50;  // ...and for beating the boss
     static constexpr float CheeseRadius = 10.0f;
-    // Each carried cheese slows the mouse down, to a minimum of 55% speed.
+    // Each unit of carried cheese weight slows the mouse down, to a minimum of 55% speed.
     static constexpr float SlowdownPerCheese = 0.07f;
     static constexpr float MinSpeedFactor = 0.55f;
     static constexpr float TrailSpacing = 22.0f;
@@ -53,13 +64,23 @@ private:
     CheeseTrail trail_;
     std::vector<Cat> cats_;
     std::vector<bool> catSeesPlayer_;
-    std::vector<Vector2> cheese_; // cheese still lying on the map
+    struct CheesePiece
+    {
+        Vector2 pos;
+        CheeseKind kind;
+    };
+    std::vector<CheesePiece> cheese_;     // cheese still lying on the map
+    std::vector<CheeseKind> carriedKinds_; // trailing behind the mouse, in pickup order
     std::vector<Vector2> peppers_; // peppers still lying on the map
     float boostTimer_ = 0.0f;      // seconds of pepper boost left
     float flashPhase_ = 0.0f;      // drives the red flashing while boosted
     int totalCheese_ = 0;
-    int carried_ = 0; // picked up, trailing behind the mouse
+    int carried_ = 0;      // pieces trailing behind the mouse
+    int carriedWeight_ = 0; // Gouda wheels count double
     int stored_ = 0;  // safely delivered to a mouse hole or the exit
+    int storedCoins_ = 0;      // shop coins those pieces are worth (Gouda 2, Golden Cheese 25)
+    bool firstClear_ = false;  // this win is the level's first clear
+    MouseSkin skin_ = MouseSkin::Classic;
 
     int hiddenIn_ = -1;   // index of the hole the mouse is hiding in, -1 if out in the open
     int ignoreHole_ = -1; // hole just left; can't re-enter until you step off it
@@ -69,6 +90,11 @@ private:
     float bestTime_ = -1.0f;
     bool newBest_ = false;
     bool hasNextLevel_ = false;
+    bool nextIsBoss_ = false;
+    int bossIndex_ = -1;         // index into cats_ of this level's boss, or -1
+    bool goldenDropped_ = false; // the knocked-out boss has dropped the Golden Cheese
+    int bossHitsShown_ = 0;      // to pop a "HIT!" message when the boss crashes
+    float bossFlash_ = 0.0f;
     State state_ = State::Playing;
     bool debug_ = false; // F1: show A* paths
 

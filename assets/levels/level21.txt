@@ -19,7 +19,7 @@
 
 name The Basement
 room basement
-# Legend: # wall  . floor  P start  C cheese  E exit  R red pepper  1-4 mouse holes (same digit = linked)
+# Legend: # wall  . floor  P start  C cheese  O gouda wheel (heavy)  E exit  R red pepper  1-4 mouse holes (same digit = linked)
 # Furniture (solid): B shelf T table K counter A appliance S sofa/seats D bed G pool table U tub/fountain
 #                    L plant X boxes Q piano F fireplace W wardrobe Y car
 # cat <tabby|sleepy|hunter|blind> x,y x,y ...  walks the waypoints forward, then back

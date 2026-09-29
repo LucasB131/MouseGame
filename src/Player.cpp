@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "Level.h"
+#include "Sprites.h"
 #include "raymath.h"
 
 Player::Player(Vector2 start) : pos_(start) {}
@@ -21,17 +22,20 @@ void Player::Update(const Level& level, float dt)
     if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT))  dir.x -= 1.0f;
     if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) dir.x += 1.0f;
 
-    if (dir.x == 0.0f && dir.y == 0.0f) return;
+    moving_ = !(dir.x == 0.0f && dir.y == 0.0f);
+    if (!moving_) return;
 
     dir = Vector2Normalize(dir);
     facing_ = dir;
     const Vector2 delta = Vector2Scale(dir, speed_ * speedMultiplier_ * dt);
 
     // Move one axis at a time so the player slides along walls instead of sticking.
+    const Vector2 before = pos_;
     pos_.x += delta.x;
     ResolveWallCollisions(level);
     pos_.y += delta.y;
     ResolveWallCollisions(level);
+    walkPhase_ += Vector2Distance(before, pos_) * 0.35f;
 }
 
 void Player::ResolveWallCollisions(const Level& level)
@@ -61,15 +65,14 @@ void Player::ResolveWallCollisions(const Level& level)
     }
 }
 
-void Player::Draw(bool flashRed) const
+void Player::Draw(bool flashRed, MouseSkin skin) const
 {
-    const Vector2 side{-facing_.y, facing_.x};
-    const Vector2 earBase = Vector2Add(pos_, Vector2Scale(facing_, 4.0f));
-    const Vector2 tailBase = Vector2Subtract(pos_, Vector2Scale(facing_, radius_));
-
-    DrawLineEx(tailBase, Vector2Subtract(tailBase, Vector2Scale(facing_, 14.0f)), 3.0f, PINK);   // tail
-    DrawCircleV(pos_, radius_, flashRed ? Color{235, 60, 50, 255} : LIGHTGRAY);                  // body
-    DrawCircleV(Vector2Add(earBase, Vector2Scale(side, 10.0f)), 6.0f, PINK);                     // ears
-    DrawCircleV(Vector2Subtract(earBase, Vector2Scale(side, 10.0f)), 6.0f, PINK);
-    DrawCircleV(Vector2Add(pos_, Vector2Scale(facing_, radius_)), 3.5f, Color{60, 40, 40, 255}); // nose
+    MouseLook look;
+    look.pos = pos_;
+    look.facing = facing_;
+    look.walkPhase = walkPhase_;
+    look.moving = moving_;
+    look.flashRed = flashRed;
+    look.skin = skin;
+    DrawMouseSprite(look);
 }

@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "CatTypes.h"
+#include "Cheese.h"
 #include "RoomTheme.h"
 #include "raylib.h"
 
@@ -41,7 +42,7 @@ struct CatSpawn
 };
 
 // A grid of tiles loaded from a plain-text file.
-//   '#' wall   '.' floor   'P' player start   'C' cheese   'E' exit
+//   '#' wall   '.' floor   'P' player start   'C' cheese   'O' gouda wheel (heavy)   'E' exit
 //   '1'-'4' mouse holes (two holes with the same digit are linked)   'R' red pepper (speed boost)
 //   furniture letters (see IsFurnitureChar)
 // After the grid and a blank line:
@@ -74,6 +75,7 @@ public:
     Rectangle TileRect(int x, int y) const;
     Vector2 PlayerStart() const { return playerStart_; }
     const std::vector<Vector2>& CheeseSpawns() const { return cheeseSpawns_; }
+    const std::vector<CheeseKind>& CheeseKinds() const { return cheeseKinds_; } // parallel to CheeseSpawns()
     const std::vector<Vector2>& PepperSpawns() const { return pepperSpawns_; }
     const std::vector<CatSpawn>& Cats() const { return cats_; }
     const std::vector<MouseHole>& Holes() const { return holes_; }
@@ -95,6 +97,7 @@ private:
     std::vector<Tile> tiles_; // row-major: tiles_[y * width_ + x]
     Vector2 playerStart_{};
     std::vector<Vector2> cheeseSpawns_;
+    std::vector<CheeseKind> cheeseKinds_;
     std::vector<Vector2> pepperSpawns_;
     std::vector<CatSpawn> cats_;
     std::vector<MouseHole> holes_;

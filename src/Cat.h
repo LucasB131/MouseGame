@@ -15,12 +15,12 @@ class Level;
 //   WindUp      -> mouse is close: crouch for a moment, aiming
 //   Lunge       -> dash in a straight line. Touching the mouse catches it; hitting a wall stuns the cat
 //   Stunned     -> dazed (spinning stars): can't see or move, then gives up and searches
+//   KnockedOut  -> bosses only: after crashing BossHitsToWin times, out cold for good
 // Speed, vision and napping come from the cat's kind (see CatTypes.h).
 class Cat
 {
 public:
-    static constexpr float Radius = 16.0f;
-    static constexpr float LungeRange = 110.0f; // starts a lunge when the mouse is this close and in sight
+    static constexpr int BossHitsToWin = 3;
 
     Cat(CatKind kind, std::vector<Vector2> route);
 
@@ -35,6 +35,14 @@ public:
     bool IsSuspicious() const;
     bool IsLunging() const { return behavior_ == Behavior::Lunge; }
     bool IsStunned() const { return behavior_ == Behavior::Stunned; }
+    bool IsKnockedOut() const { return behavior_ == Behavior::KnockedOut; }
+    bool IsHarmless() const { return IsStunned() || IsKnockedOut(); }
+    bool IsBoss() const { return stats_->boss; }
+    int BossHits() const { return hits_; }
+    // Seconds before the pounce that the boss stops tracking the mouse; the red lane brightens at this moment.
+    float AimLockTime() const { return BossAimLock - 0.05f * static_cast<float>(hits_); }
+    float BodyRadius() const { return stats_->radius; }
+    const char* Name() const { return stats_->name; }
     bool IsAsleep() const { return asleep_; }
     Vector2 Position() const { return pos_; }
 
@@ -43,7 +51,7 @@ public:
     void DrawDebug() const; // current A* path, last known mouse position
 
 private:
-    enum class Behavior { Patrol, Investigate, Search, Return, WindUp, Lunge, Stunned };
+    enum class Behavior { Patrol, Investigate, Search, Return, WindUp, Lunge, Stunned, KnockedOut };
     enum class PatrolStep { Waiting, Turning, Moving };
 
     void UpdatePatrol(float dt);
@@ -55,6 +63,7 @@ private:
     void StartSearch();
     void AdvanceWaypoint();
 
+    CatKind kind_;
     const CatStats* stats_;
 
     // Napping (only for kinds with sleepTime > 0)
@@ -67,6 +76,9 @@ private:
     int direction_ = 1; // +1 walking forward through the route, -1 walking back
 
     Vector2 pos_{};
+    Vector2 prevPos_{};
+    float walkPhase_ = 0.0f; // paw animation
+    bool moving_ = false;
     float facing_ = 0.0f; // radians, 0 = right, positive = clockwise on screen
 
     Behavior behavior_ = Behavior::Patrol;
@@ -86,6 +98,8 @@ private:
 
     // Lunge
     Vector2 lungeDir_{1.0f, 0.0f};
+    Vector2 lungeTarget_{};  // where the pounce is aimed (bosses lock their aim just before pouncing)
+    int hits_ = 0;           // bosses: how many times it has crashed
     float lungeTraveled_ = 0.0f;
     float lungeCooldown_ = 0.0f;
 
@@ -93,9 +107,6 @@ private:
     static constexpr float PauseTime = 0.8f;       // seconds at each patrol waypoint
     static constexpr float SearchTime = 2.5f;      // seconds spent looking around
     static constexpr float RepathInterval = 0.2f;  // min seconds between path recalculations
-    static constexpr float WindUpTime = 0.25f;     // crouch before the lunge (your warning!)
-    static constexpr float LungeSpeed = 560.0f;    // pixels per second
-    static constexpr float LungeDistance = 150.0f; // max length of a lunge
     static constexpr float LungeCooldown = 1.2f;   // seconds before it can lunge again after a miss
-    static constexpr float StunTime = 1.8f;        // seconds dazed after lunging into a wall
+    static constexpr float BossAimLock = 0.5f;     // bosses stop tracking the mouse this long before pouncing (less each hit)
 };

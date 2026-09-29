@@ -6,6 +6,7 @@
 
 #include "Level.h"
 #include "Pathfinding.h"
+#include "Sprites.h"
 #include "raymath.h"
 
 namespace
@@ -45,7 +46,7 @@ void DrawStar(Vector2 c, float outer, float rotation, Color color)
 }
 } // namespace
 
-Cat::Cat(CatKind kind, std::vector<Vector2> route) : stats_(&GetCatStats(kind)), route_(std::move(route))
+Cat::Cat(CatKind kind, std::vector<Vector2> route) : kind_(kind), stats_(&GetCatStats(kind)), route_(std::move(route))
 {
     pos_ = route_.front();
     // Stagger nap timing by position so sleepy cats in the same level don't all nap in sync.
@@ -65,6 +66,7 @@ bool Cat::IsSuspicious() const
 
 void Cat::Update(const Level& level, float dt)
 {
+    prevPos_ = pos_;
     repathTimer_ -= dt;
     lungeCooldown_ -= dt;
     sinceSeen_ += dt;
@@ -77,7 +79,7 @@ void Cat::Update(const Level& level, float dt)
         break;
 
     case Behavior::Investigate:
-        if (FollowPath(dt, stats_->chaseSpeed)) StartSearch();
+        if (FollowPath(dt, stats_->chaseSpeed * (1.0f + 0.12f * hits_))) StartSearch(); // bosses speed up when hurt
         break;
 
     case Behavior::Search:
@@ -106,12 +108,13 @@ void Cat::Update(const Level& level, float dt)
         break;
 
     case Behavior::WindUp:
-        // Keep aiming at the mouse while crouching.
-        TurnToward(AngleTo(pos_, lastSeen_), TurnSpeed * 4.0f * dt);
+        // Keep aiming at the mouse while crouching (bosses lock in just before they leap).
+        if (!stats_->boss || timer_ > AimLockTime()) lungeTarget_ = lastSeen_;
+        TurnToward(AngleTo(pos_, lungeTarget_), TurnSpeed * 4.0f * dt);
         timer_ -= dt;
         if (timer_ <= 0.0f)
         {
-            const Vector2 d = Vector2Subtract(lastSeen_, pos_);
+            const Vector2 d = Vector2Subtract(lungeTarget_, pos_);
             lungeDir_ = Vector2Length(d) > 1.0f ? Vector2Normalize(d) : FromAngle(facing_);
             facing_ = std::atan2(lungeDir_.y, lungeDir_.x);
             lungeTraveled_ = 0.0f;
@@ -127,29 +130,41 @@ void Cat::Update(const Level& level, float dt)
         timer_ -= dt;
         if (timer_ <= 0.0f) StartSearch(); // lost track of the mouse while dazed
         break;
+
+    case Behavior::KnockedOut:
+        break;
     }
+
+    const float moved = Vector2Distance(prevPos_, pos_);
+    moving_ = moved > 0.05f;
+    walkPhase_ += moved * 0.3f;
 }
 
 void Cat::UpdateLunge(const Level& level, float dt)
 {
     // Move in small steps so a fast lunge can't skip through a wall.
-    float remaining = LungeSpeed * dt;
+    float remaining = stats_->lungeSpeed * dt;
     while (remaining > 0.0f)
     {
         const float step = std::min(4.0f, remaining);
         const Vector2 next = Vector2Add(pos_, Vector2Scale(lungeDir_, step));
-        if (level.CircleOverlapsWall(next, Radius))
+        if (level.CircleOverlapsWall(next, stats_->radius))
         {
-            // Smacked into a wall: dazed.
-            behavior_ = Behavior::Stunned;
-            timer_ = StunTime;
+            // Smacked into a wall or furniture: dazed. Bosses take a hit, and enough hits knock them out.
             path_.clear();
+            if (stats_->boss && ++hits_ >= BossHitsToWin)
+            {
+                behavior_ = Behavior::KnockedOut;
+                return;
+            }
+            behavior_ = Behavior::Stunned;
+            timer_ = stats_->stunTime;
             return;
         }
         pos_ = next;
         remaining -= step;
         lungeTraveled_ += step;
-        if (lungeTraveled_ >= LungeDistance)
+        if (lungeTraveled_ >= stats_->lungeDistance)
         {
             // Missed. Still have eyes on the mouse? Keep chasing. Otherwise lose interest and look around.
             lungeCooldown_ = LungeCooldown;
@@ -268,7 +283,7 @@ bool Cat::TurnToward(float angle, float maxStep)
 
 void Cat::StartPath(const Level& level, Vector2 goal)
 {
-    path_ = FindPath(level, pos_, goal, Radius + 2.0f);
+    path_ = FindPath(level, pos_, goal, stats_->radius + 2.0f);
     pathIndex_ = 0;
     repathTimer_ = RepathInterval;
 }
@@ -287,13 +302,16 @@ void Cat::Alert(const Level& level, Vector2 lastSeen)
     sinceSeen_ = 0.0f;
 
     // Mid-pounce or dazed: just remember where the mouse is.
-    if (behavior_ == Behavior::WindUp || behavior_ == Behavior::Lunge || behavior_ == Behavior::Stunned) return;
+    if (behavior_ == Behavior::WindUp || behavior_ == Behavior::Lunge || behavior_ == Behavior::Stunned ||
+        behavior_ == Behavior::KnockedOut)
+        return;
 
-    // Close enough to pounce?
-    if (lungeCooldown_ <= 0.0f && Vector2Distance(pos_, lastSeen) <= LungeRange)
+    // Close enough to pounce? (An angry boss crouches for less time.)
+    if (lungeCooldown_ <= 0.0f && Vector2Distance(pos_, lastSeen) <= stats_->lungeRange)
     {
         behavior_ = Behavior::WindUp;
-        timer_ = WindUpTime;
+        timer_ = stats_->windUpTime * (1.0f - 0.15f * hits_);
+        lungeTarget_ = lastSeen;
         return;
     }
 
@@ -305,7 +323,7 @@ void Cat::Alert(const Level& level, Vector2 lastSeen)
 
 bool Cat::CanSee(const Level& level, Vector2 point, float r) const
 {
-    if (asleep_ || behavior_ == Behavior::Stunned) return false;
+    if (asleep_ || behavior_ == Behavior::Stunned || behavior_ == Behavior::KnockedOut) return false;
 
     const Vector2 to = Vector2Subtract(point, pos_);
     const float dist = Vector2Length(to);
@@ -328,7 +346,7 @@ void Cat::Draw(const Level& level, bool seesPlayer) const
     const float t = static_cast<float>(GetTime());
 
     // Vision area: cast rays across the cone (or all the way around) and stop each at the first wall.
-    if (!asleep_ && behavior_ != Behavior::Stunned)
+    if (!asleep_ && behavior_ != Behavior::Stunned && behavior_ != Behavior::KnockedOut)
     {
         const int rays = half >= PI ? 90 : 48;
         const Color calm{255, 230, 90, 255};
@@ -349,59 +367,72 @@ void Cat::Draw(const Level& level, bool seesPlayer) const
     }
 
     const Vector2 f = FromAngle(facing_);
-    const Vector2 side{-f.y, f.x};
 
-    // Wind-up: crouch back and tremble. Lunge: motion blur behind the body.
-    Vector2 body = pos_;
-    if (behavior_ == Behavior::WindUp)
-        body = Vector2Add(Vector2Subtract(pos_, Vector2Scale(f, 5.0f)), Vector2Scale(side, std::sin(t * 70.0f) * 1.5f));
-    if (behavior_ == Behavior::Lunge)
+    const float radius = stats_->radius;
+
+    // Boss wind-up: a red lane shows exactly where the pounce will go.
+    if (stats_->boss && behavior_ == Behavior::WindUp)
     {
-        for (int i = 3; i >= 1; --i)
-            DrawCircleV(Vector2Subtract(pos_, Vector2Scale(lungeDir_, 12.0f * i)), Radius - 2.0f * i, Fade(stats_->fur, 0.12f * (4 - i)));
+        const Vector2 aim = Vector2Normalize(Vector2Subtract(lungeTarget_, pos_));
+        const Vector2 side{-aim.y, aim.x};
+        const float len = stats_->lungeDistance + radius;
+        const bool locked = timer_ <= AimLockTime();
+        const Color lane = Fade(RED, locked ? 0.45f : 0.2f + 0.1f * std::sin(t * 30.0f));
+        const Vector2 a = Vector2Add(pos_, Vector2Scale(side, radius));
+        const Vector2 b = Vector2Subtract(pos_, Vector2Scale(side, radius));
+        const Vector2 c = Vector2Add(b, Vector2Scale(aim, len));
+        const Vector2 d = Vector2Add(a, Vector2Scale(aim, len));
+        DrawTriangleAnyOrder(a, b, c, lane);
+        DrawTriangleAnyOrder(a, c, d, lane);
     }
 
-    const Vector2 earL = Vector2Add(body, Vector2Add(Vector2Scale(f, 8.0f), Vector2Scale(side, 11.0f)));
-    const Vector2 earR = Vector2Add(body, Vector2Subtract(Vector2Scale(f, 8.0f), Vector2Scale(side, 11.0f)));
-    const Vector2 eyeL = Vector2Add(body, Vector2Add(Vector2Scale(f, 9.0f), Vector2Scale(side, 5.0f)));
-    const Vector2 eyeR = Vector2Add(body, Vector2Subtract(Vector2Scale(f, 9.0f), Vector2Scale(side, 5.0f)));
-    DrawCircleV(earL, 6.5f, stats_->furDark);
-    DrawCircleV(earR, 6.5f, stats_->furDark);
-    DrawCircleV(body, Radius, stats_->fur);
+    // Lunge: motion blur behind the body.
+    if (behavior_ == Behavior::Lunge)
+        for (int i = 3; i >= 1; --i)
+            DrawCircleV(Vector2Subtract(pos_, Vector2Scale(lungeDir_, 12.0f * i * radius / 16.0f)), radius - 2.0f * i, Fade(stats_->fur, 0.12f * (4 - i)));
+
+    CatLook look;
+    look.pos = pos_;
+    look.facing = f;
+    look.kind = kind_;
+    look.walkPhase = walkPhase_;
+    look.moving = moving_;
+    look.alert = seesPlayer || behavior_ == Behavior::Investigate;
+    look.tailSeed = route_.front().x * 0.37f + route_.front().y * 0.11f;
+    look.scale = radius / 16.0f;
+    if (asleep_) look.pose = CatPose::Asleep;
+    else if (behavior_ == Behavior::Stunned || behavior_ == Behavior::KnockedOut) look.pose = CatPose::Stunned;
+    else if (behavior_ == Behavior::WindUp) look.pose = CatPose::WindUp;
+    else if (behavior_ == Behavior::Lunge) look.pose = CatPose::Lunge;
+    if (behavior_ == Behavior::WindUp) // tremble while crouching
+        look.pos = Vector2Add(look.pos, Vector2Scale(Vector2{-f.y, f.x}, std::sin(t * 70.0f) * 1.2f));
+    DrawCatSprite(look);
 
     if (asleep_)
     {
-        // Closed eyes and floating Z's.
-        DrawLineEx(Vector2Subtract(eyeL, Vector2Scale(side, 2.5f)), Vector2Add(eyeL, Vector2Scale(side, 2.5f)), 2.0f, stats_->furDark);
-        DrawLineEx(Vector2Subtract(eyeR, Vector2Scale(side, 2.5f)), Vector2Add(eyeR, Vector2Scale(side, 2.5f)), 2.0f, stats_->furDark);
         const float bob = std::sin(t * 3.0f) * 3.0f;
         DrawText("z", static_cast<int>(pos_.x) + 10, static_cast<int>(pos_.y - 26 + bob), 16, SKYBLUE);
         DrawText("Z", static_cast<int>(pos_.x) + 18, static_cast<int>(pos_.y - 40 - bob), 20, SKYBLUE);
         return;
     }
 
-    if (behavior_ == Behavior::Stunned)
+    if (behavior_ == Behavior::Stunned || behavior_ == Behavior::KnockedOut)
     {
-        // X eyes and stars circling above the head.
-        for (const Vector2& e : {eyeL, eyeR})
+        // Stars circling above the head.
+        const int stars = behavior_ == Behavior::KnockedOut ? 5 : 3;
+        for (int i = 0; i < stars; ++i)
         {
-            DrawLineEx({e.x - 3, e.y - 3}, {e.x + 3, e.y + 3}, 2.0f, stats_->furDark);
-            DrawLineEx({e.x - 3, e.y + 3}, {e.x + 3, e.y - 3}, 2.0f, stats_->furDark);
-        }
-        for (int i = 0; i < 3; ++i)
-        {
-            const float a = t * 5.0f + i * 2.0f * PI / 3.0f;
-            const Vector2 star{pos_.x + std::cos(a) * 16.0f, pos_.y - Radius - 10.0f + std::sin(a) * 5.0f};
+            const float a = t * 5.0f + i * 2.0f * PI / stars;
+            const Vector2 star{pos_.x + std::cos(a) * radius, pos_.y - radius - 12.0f + std::sin(a) * 5.0f};
             DrawStar(star, 6.0f, t * 4.0f, YELLOW);
         }
+        if (behavior_ == Behavior::KnockedOut)
+            DrawText("K.O.", static_cast<int>(pos_.x) - MeasureText("K.O.", 26) / 2, static_cast<int>(pos_.y - radius) - 58, 26, GOLD);
         return;
     }
 
-    DrawCircleV(eyeL, 3.0f, stats_->eye);
-    DrawCircleV(eyeR, 3.0f, stats_->eye);
-
     const int tx = static_cast<int>(pos_.x) - 4;
-    const int ty = static_cast<int>(pos_.y - Radius) - 30;
+    const int ty = static_cast<int>(pos_.y - radius) - 34;
     if (behavior_ == Behavior::WindUp || behavior_ == Behavior::Lunge)
         DrawText("!!", tx - 6, ty - 2, 30, RED);
     else if (seesPlayer)
@@ -436,6 +467,6 @@ void Cat::DrawDebug() const
         }
     }
     if (behavior_ == Behavior::WindUp || behavior_ == Behavior::Lunge)
-        DrawCircleLinesV(pos_, LungeRange, Fade(RED, 0.5f));
+        DrawCircleLinesV(pos_, stats_->lungeRange, Fade(RED, 0.5f));
     if (IsSuspicious()) DrawCircleLinesV(lastSeen_, 10.0f, RED);
 }

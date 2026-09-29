@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "Sprites.h"
 #include "raymath.h"
 
 std::string FormatTime(float seconds)
@@ -11,12 +12,13 @@ std::string FormatTime(float seconds)
     return TextFormat("%d:%02d.%d", tenths / 600, (tenths / 10) % 60, tenths % 10);
 }
 
-bool Game::Init(const std::string& levelPath, float bestTime, bool hasNextLevel)
+bool Game::Init(const std::string& levelPath, float bestTime, bool hasNextLevel, bool nextIsBoss)
 {
     if (!level_.LoadFromFile(levelPath)) return false;
     renderer_.Build(level_);
     bestTime_ = bestTime;
     hasNextLevel_ = hasNextLevel;
+    nextIsBoss_ = nextIsBoss;
     Reset();
     return true;
 }
@@ -25,19 +27,32 @@ void Game::Reset()
 {
     player_ = Player(level_.PlayerStart());
     trail_.Reset(level_.PlayerStart());
-    cheese_ = level_.CheeseSpawns();
+    cheese_.clear();
+    for (size_t i = 0; i < level_.CheeseSpawns().size(); ++i) cheese_.push_back({level_.CheeseSpawns()[i], level_.CheeseKinds()[i]});
+    carriedKinds_.clear();
+    carriedWeight_ = 0;
     peppers_ = level_.PepperSpawns();
     boostTimer_ = 0.0f;
     flashPhase_ = 0.0f;
     totalCheese_ = static_cast<int>(cheese_.size());
     carried_ = 0;
     stored_ = 0;
+    storedCoins_ = 0;
+    firstClear_ = false;
     hiddenIn_ = -1;
     ignoreHole_ = -1;
     waitForKeyRelease_ = false;
 
     cats_.clear();
-    for (const CatSpawn& spawn : level_.Cats()) cats_.emplace_back(spawn.kind, spawn.route);
+    bossIndex_ = -1;
+    for (const CatSpawn& spawn : level_.Cats())
+    {
+        if (GetCatStats(spawn.kind).boss) bossIndex_ = static_cast<int>(cats_.size());
+        cats_.emplace_back(spawn.kind, spawn.route);
+    }
+    goldenDropped_ = false;
+    bossHitsShown_ = 0;
+    bossFlash_ = 0.0f;
     catSeesPlayer_.assign(cats_.size(), false);
 
     elapsed_ = 0.0f;
@@ -70,6 +85,39 @@ void Game::Update(float dt)
 
     UpdatePlayer(dt);
     if (state_ == State::Playing) UpdateCats(dt);
+    if (state_ == State::Playing) UpdateBoss();
+    bossFlash_ = std::max(0.0f, bossFlash_ - dt);
+}
+
+void Game::UpdateBoss()
+{
+    if (bossIndex_ < 0) return;
+    const Cat& boss = cats_[bossIndex_];
+    if (boss.BossHits() > bossHitsShown_)
+    {
+        bossHitsShown_ = boss.BossHits();
+        bossFlash_ = 1.2f;
+    }
+    if (boss.IsKnockedOut() && !goldenDropped_)
+    {
+        // Drop the Golden Cheese on an open tile next to the fallen boss.
+        goldenDropped_ = true;
+        const int bx = static_cast<int>(boss.Position().x) / Level::TileSize;
+        const int by = static_cast<int>(boss.Position().y) / Level::TileSize;
+        Vector2 spot = boss.Position();
+        static const int offsets[][2] = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}, {1, 1}, {-1, 1}, {1, -1}, {-1, -1}, {0, 2}, {0, -2}};
+        for (const auto& o : offsets)
+        {
+            const int dx = o[0], dy = o[1];
+            if (!level_.IsWall(bx + dx, by + dy) && level_.At(bx + dx, by + dy) != Tile::Hole)
+            {
+                spot = {(bx + dx + 0.5f) * Level::TileSize, (by + dy + 0.5f) * Level::TileSize};
+                break;
+            }
+        }
+        cheese_.push_back({spot, CheeseKind::Golden});
+        ++totalCheese_;
+    }
 }
 
 void Game::UpdatePlayer(float dt)
@@ -89,17 +137,19 @@ void Game::UpdatePlayer(float dt)
         hiddenIn_ = -1; // step out (ignoreHole_ stops us from instantly re-entering)
     }
 
-    const float cheeseFactor = std::max(MinSpeedFactor, 1.0f - SlowdownPerCheese * static_cast<float>(carried_));
+    const float cheeseFactor = std::max(MinSpeedFactor, 1.0f - SlowdownPerCheese * static_cast<float>(carriedWeight_));
     player_.SetSpeedMultiplier(cheeseFactor * (boostTimer_ > 0.0f ? PepperBoost : 1.0f));
     player_.Update(level_, dt);
     trail_.Record(player_.Position());
 
     // Pick up cheese: it joins the trail behind the mouse.
-    const size_t before = cheese_.size();
-    std::erase_if(cheese_, [&](const Vector2& c) {
-        return CheckCollisionCircles(player_.Position(), player_.Radius(), c, CheeseRadius);
+    std::erase_if(cheese_, [&](const CheesePiece& c) {
+        if (!CheckCollisionCircles(player_.Position(), player_.Radius(), c.pos, CheeseRadius)) return false;
+        carriedKinds_.push_back(c.kind);
+        carriedWeight_ += GetCheeseInfo(c.kind).weight;
+        ++carried_;
+        return true;
     });
-    carried_ += static_cast<int>(before - cheese_.size());
 
     // Red pepper: eat it for a speed boost (a second pepper refills the timer).
     const size_t peppersBefore = peppers_.size();
@@ -130,6 +180,7 @@ void Game::UpdatePlayer(float dt)
     {
         StoreCheese(player_.Position());
         state_ = State::Won;
+        firstClear_ = bestTime_ < 0.0f;
         newBest_ = bestTime_ < 0.0f || elapsed_ < bestTime_;
         if (newBest_) bestTime_ = elapsed_;
     }
@@ -150,10 +201,13 @@ void Game::StoreCheese(Vector2 where)
 {
     if (carried_ == 0) return;
     stored_ += carried_;
+    for (CheeseKind kind : carriedKinds_) storedCoins_ += GetCheeseInfo(kind).coins;
     popupCount_ = carried_;
     popupPos_ = where;
     popupTimer_ = 1.2f;
     carried_ = 0;
+    carriedWeight_ = 0;
+    carriedKinds_.clear();
 }
 
 bool Game::IsFlashingRed() const
@@ -179,6 +233,32 @@ void DrawPepper(Vector2 c, float t)
 }
 } // namespace
 
+void Game::DrawBossHud() const
+{
+    if (bossIndex_ < 0) return;
+    const Cat& boss = cats_[bossIndex_];
+    const int w = GetScreenWidth();
+    // Name plate and three "health" paws that break as he crashes.
+    const Rectangle plate{w / 2.0f - 150, static_cast<float>(GetScreenHeight()) - 37.0f, 300, 34}; // below the map, clear of the throne
+    DrawRectangleRounded(plate, 0.4f, 8, Fade(BLACK, 0.6f));
+    DrawText("SIR POUNCE", static_cast<int>(plate.x + 14), static_cast<int>(plate.y + 8), 20, Color{255, 150, 130, 255});
+    for (int i = 0; i < Cat::BossHitsToWin; ++i)
+    {
+        const bool lost = i < boss.BossHits();
+        const Vector2 c{plate.x + 190 + i * 36, plate.y + 17};
+        const Color col = lost ? Color{80, 70, 70, 255} : Color{230, 70, 70, 255};
+        DrawCircleV({c.x, c.y + 3}, 7, col); // paw pad
+        for (int t = 0; t < 3; ++t) DrawCircleV({c.x - 7 + t * 7.0f, c.y - 6}, 3, col);
+        if (lost) DrawLineEx({c.x - 9, c.y + 9}, {c.x + 9, c.y - 9}, 2, Color{200, 200, 200, 255});
+    }
+    if (bossFlash_ > 0.0f && !boss.IsKnockedOut())
+    {
+        const char* msg = TextFormat("CRASH!  %d / %d", boss.BossHits(), Cat::BossHitsToWin);
+        const int size = 44;
+        DrawText(msg, w / 2 - MeasureText(msg, size) / 2, 90, size, Fade(GOLD, std::min(1.0f, bossFlash_)));
+    }
+}
+
 void Game::UpdateCats(float dt)
 {
     // Cats: move, then check whether they can see or touch the mouse (never while it's hidden in a hole).
@@ -190,9 +270,9 @@ void Game::UpdateCats(float dt)
         catSeesPlayer_[i] = false;
         if (IsHidden()) continue;
 
-        // Caught by contact. A lunging cat's paws reach a little further; a dazed cat is harmless.
-        const float reach = Cat::Radius + (cat.IsLunging() ? 6.0f : 0.0f);
-        if (!cat.IsStunned() && CheckCollisionCircles(player_.Position(), player_.Radius(), cat.Position(), reach))
+        // Caught by contact. A lunging cat's paws reach a little further; a dazed or knocked-out cat is harmless.
+        const float reach = cat.BodyRadius() + (cat.IsLunging() ? 6.0f : 0.0f);
+        if (!cat.IsHarmless() && CheckCollisionCircles(player_.Position(), player_.Radius(), cat.Position(), reach))
         {
             state_ = State::Caught;
             return;
@@ -209,8 +289,17 @@ void Game::Draw() const
 
     for (const Cat& cat : cats_) cat.DrawRoute();
 
-    for (const Vector2& c : cheese_)
-        DrawPoly(c, 3, CheeseRadius + 2.0f, -90.0f, GOLD);
+    const float now = static_cast<float>(GetTime());
+    for (const CheesePiece& c : cheese_)
+    {
+        // Each piece sits at its own angle and gently bobs so it catches the eye.
+        const float angle = std::fmod(c.pos.x * 0.37f + c.pos.y * 0.73f, 2.0f * PI);
+        const float bob = std::sin(now * 2.5f + c.pos.x * 0.1f) * 1.5f;
+        const float glow = 0.18f + 0.08f * std::sin(now * 3.0f + c.pos.y * 0.05f);
+        DrawCircleV(c.pos, 19.0f, Fade(Color{255, 214, 90, 255}, glow)); // soft glow so pale cheeses stand out
+        DrawCircleV(c.pos, 14.0f, Fade(Color{255, 230, 140, 255}, glow));
+        DrawCheeseSprite(c.kind, {c.pos.x, c.pos.y + bob}, angle, 1.05f);
+    }
     for (const Vector2& p : peppers_) DrawPepper(p, static_cast<float>(GetTime()));
 
     for (size_t i = 0; i < cats_.size(); ++i)
@@ -222,10 +311,13 @@ void Game::Draw() const
     const float t = static_cast<float>(GetTime());
     for (int i = carried_ - 1; i >= 0; --i)
     {
-        const Vector2 p = trail_.PointBehind(player_.Position(), 30.0f + TrailSpacing * static_cast<float>(i));
-        const float wobble = std::sin(t * 8.0f + static_cast<float>(i)) * 8.0f;
-        DrawPoly(p, 3, CheeseRadius, -90.0f + wobble, GOLD);
-        DrawPolyLines(p, 3, CheeseRadius, -90.0f + wobble, Color{200, 150, 20, 255});
+        const float d = 30.0f + TrailSpacing * static_cast<float>(i);
+        const Vector2 p = trail_.PointBehind(player_.Position(), d);
+        // Point each piece along the trail, toward the mouse.
+        const Vector2 ahead = trail_.PointBehind(player_.Position(), d - 6.0f);
+        const float heading = (Vector2Distance(ahead, p) > 0.5f) ? std::atan2(ahead.y - p.y, ahead.x - p.x) : -PI / 2;
+        const float wobble = std::sin(t * 8.0f + static_cast<float>(i)) * 0.15f;
+        DrawCheeseSprite(carriedKinds_[i], p, heading + wobble, 0.85f);
     }
 
     if (IsHidden())
@@ -238,7 +330,7 @@ void Game::Draw() const
     }
     else
     {
-        player_.Draw(IsFlashingRed());
+        player_.Draw(IsFlashingRed(), skin_);
     }
 
     if (popupTimer_ > 0.0f)
@@ -273,6 +365,16 @@ void Game::Draw() const
                               : "Hidden!  Move to leave";
         hintColor = HoleColor(hole.color);
     }
+    else if (bossIndex_ >= 0 && !cats_[bossIndex_].IsKnockedOut())
+    {
+        hint = "Trick Sir Pounce into pouncing into walls or furniture!";
+        hintColor = Color{255, 140, 120, 255};
+    }
+    else if (bossIndex_ >= 0 && !cheese_.empty())
+    {
+        hint = "He's out cold! Grab the Golden Cheese!";
+        hintColor = GOLD;
+    }
     else if (AllCheeseFound())
     {
         hint = "All cheese found! Get to the exit.";
@@ -287,6 +389,8 @@ void Game::Draw() const
     DrawText(keys, w - MeasureText(keys, 20) - 12, 6, 20, GRAY);
     if (debug_) DrawText("DEBUG (F1)", 12, h - 26, 20, SKYBLUE);
 
+    DrawBossHud();
+
     // Level name, fading out over the first two seconds.
     if (state_ == State::Playing && elapsed_ < 2.0f && !level_.Name().empty())
     {
@@ -299,18 +403,25 @@ void Game::Draw() const
     {
         const bool won = state_ == State::Won;
         DrawRectangle(0, 0, w, h, Fade(BLACK, 0.6f));
-        const char* msg = won ? "LEVEL COMPLETE!" : "CAUGHT!";
+        const char* msg = won ? (bossIndex_ >= 0 ? "SIR POUNCE DEFEATED!" : "LEVEL COMPLETE!") : "CAUGHT!";
         DrawText(msg, w / 2 - MeasureText(msg, 60) / 2, h / 2 - 80, 60, won ? GOLD : RED);
 
         if (won)
         {
             const char* time = TextFormat("Time %s%s", FormatTime(elapsed_).c_str(), newBest_ ? "   New best!" : "");
-            DrawText(time, w / 2 - MeasureText(time, 28) / 2, h / 2 - 5, 28, newBest_ ? GREEN : RAYWHITE);
+            DrawText(time, w / 2 - MeasureText(time, 28) / 2, h / 2 - 10, 28, newBest_ ? GREEN : RAYWHITE);
             if (!newBest_)
             {
                 const char* best = TextFormat("Best %s", FormatTime(bestTime_).c_str());
-                DrawText(best, w / 2 - MeasureText(best, 22) / 2, h / 2 + 30, 22, LIGHTGRAY);
+                DrawText(best, w / 2 - MeasureText(best, 22) / 2, h / 2 + 24, 22, LIGHTGRAY);
             }
+            // Coins earned (the shop's currency).
+            const char* coins = TextFormat("+%d coins%s", CoinsEarned(), firstClear_ ? "  (first clear bonus!)" : "");
+            const int coinsW = MeasureText(coins, 24);
+            const float coinX = w / 2.0f - coinsW / 2.0f - 20;
+            DrawCircleV({coinX, h / 2.0f + 62.0f}, 10, Color{190, 140, 20, 255});
+            DrawCircleV({coinX, h / 2.0f + 62.0f}, 8, GOLD);
+            DrawText(coins, w / 2 - coinsW / 2 + 4, h / 2 + 50, 24, GOLD);
         }
         else
         {
@@ -318,8 +429,14 @@ void Game::Draw() const
             DrawText(lost, w / 2 - MeasureText(lost, 24) / 2, h / 2 - 5, 24, LIGHTGRAY);
         }
 
-        const char* sub = won ? (hasNextLevel_ ? "Enter: next level     R: replay     Esc: menu" : "You beat the last level!     R: replay     Esc: menu")
+        if (won && bossIndex_ >= 0)
+        {
+            const char* unlock = "World 2 unlocked!";
+            DrawText(unlock, w / 2 - MeasureText(unlock, 30) / 2, h / 2 + 130, 30, Color{130, 225, 150, 255});
+        }
+        const char* sub = won ? (hasNextLevel_ ? (nextIsBoss_ ? "Enter: face the boss!     R: replay     Esc: menu" : "Enter: next level     R: replay     Esc: menu")
+                                               : "R: replay     Esc: menu")
                               : "R: try again     Esc: menu";
-        DrawText(sub, w / 2 - MeasureText(sub, 22) / 2, h / 2 + 70, 22, RAYWHITE);
+        DrawText(sub, w / 2 - MeasureText(sub, 22) / 2, h / 2 + (won ? 92 : 70), 22, RAYWHITE);
     }
 }
