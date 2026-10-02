@@ -34,6 +34,8 @@ public:
 
     bool IsSuspicious() const;
     bool IsLunging() const { return behavior_ == Behavior::Lunge; }
+    bool IsWindingUp() const { return behavior_ == Behavior::WindUp; }
+    bool IsChasing() const { return behavior_ == Behavior::Investigate || behavior_ == Behavior::WindUp || behavior_ == Behavior::Lunge; }
     bool IsStunned() const { return behavior_ == Behavior::Stunned; }
     bool IsKnockedOut() const { return behavior_ == Behavior::KnockedOut; }
     bool IsHarmless() const { return IsStunned() || IsKnockedOut(); }

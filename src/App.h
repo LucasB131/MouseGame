@@ -39,6 +39,7 @@ private:
     void UpdateLevels();
     void UpdatePlaying();
     void UpdateShop();
+    void UpdateMusic(); // picks the track for the current screen (menu, house, Egypt or boss)
 
     void DrawIntro() const;
     void DrawWorlds() const;
@@ -88,6 +89,7 @@ private:
     Game game_;
     Screen screen_ = Screen::Intro;
     float introTime_ = 0.0f;
+    bool introSounded_ = false;
     int selectedWorld_ = 0;
     int selectedSlot_ = 0;
     int lastGridSlot_ = 4;     // where Left returns to from the boss slot

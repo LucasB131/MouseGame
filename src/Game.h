@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "Audio.h"
 #include "Cat.h"
 #include "CheeseTrail.h"
 #include "Level.h"
@@ -38,8 +39,9 @@ private:
     void Reset();
     void UpdatePlayer(float dt);
     void UpdateCats(float dt);
-    void EnterHole(int index);
-    void StoreCheese(Vector2 where);
+    void EnterHole(int index, bool teleport = false);
+    void StoreCheese(Vector2 where, bool silent = false);
+    void CatSounds(size_t index, float dt); // plays a sound whenever a cat changes what it is doing
     bool IsFlashingRed() const;
     // The exit opens once every piece of cheese is picked up (and, on a boss level, the boss is out cold
     // and its Golden Cheese has been grabbed).
@@ -55,6 +57,7 @@ private:
     static constexpr float SlowdownPerCheese = 0.07f;
     static constexpr float MinSpeedFactor = 0.55f;
     static constexpr float TrailSpacing = 22.0f;
+    static constexpr float StepSpacing = 26.0f; // pixels walked per footstep sound
     // Red pepper: temporary speed boost (stacks with the cheese slowdown).
     static constexpr float PepperBoost = 1.5f;
     static constexpr float PepperDuration = 5.0f; // seconds
@@ -66,6 +69,15 @@ private:
     CheeseTrail trail_;
     std::vector<Cat> cats_;
     std::vector<bool> catSeesPlayer_;
+    struct CatSoundState
+    {
+        bool chasing = false, windingUp = false, lunging = false, stunned = false, knockedOut = false;
+        float alertCooldown = 0.0f;
+    };
+    std::vector<CatSoundState> catSound_; // what each cat was doing last frame, to spot changes
+    float stepDistance_ = 0.0f;           // distance walked since the last footstep sound
+    bool stepFlip_ = false;
+    bool exitWasOpen_ = false;
     struct CheesePiece
     {
         Vector2 pos;

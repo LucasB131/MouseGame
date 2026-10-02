@@ -4,6 +4,7 @@
 #include <cmath>
 #include <fstream>
 
+#include "Audio.h"
 #include "Sprites.h"
 #include "Viewport.h"
 #include "raylib.h"
@@ -122,6 +123,11 @@ void App::RefreshSummary()
 
 bool App::Update()
 {
+    // Remember where the cursor was so menu blips can be played for whatever changed.
+    const Screen screenBefore = screen_;
+    const int worldBefore = selectedWorld_, slotBefore = selectedSlot_, shopSelBefore = shopSel_, shopTabBefore = shopTab_;
+    const int levelBefore = current_;
+
     switch (screen_)
     {
     case Screen::Intro:   UpdateIntro(); break;
@@ -130,13 +136,53 @@ bool App::Update()
     case Screen::Playing: UpdatePlaying(); break;
     case Screen::Shop:    UpdateShop(); break;
     }
+
+    if (screen_ != screenBefore)
+    {
+        if (screenBefore == Screen::Intro)
+            ; // the intro has its own jingle
+        else if (screen_ == Screen::Worlds || (screenBefore == Screen::Playing && screen_ == Screen::Levels))
+            Audio::Play(Sfx::UiBack);
+        else
+            Audio::Play(Sfx::UiSelect);
+    }
+    else if (screen_ == Screen::Playing)
+    {
+        if (current_ != levelBefore) Audio::Play(Sfx::UiSelect); // straight on to the next level
+    }
+    else if (selectedWorld_ != worldBefore || selectedSlot_ != slotBefore || shopSel_ != shopSelBefore || shopTab_ != shopTabBefore)
+    {
+        Audio::Play(Sfx::UiMove);
+    }
+
+    UpdateMusic();
     return !quit_;
+}
+
+void App::UpdateMusic()
+{
+    switch (screen_)
+    {
+    case Screen::Intro:   Audio::PlayMusic(Track::None); break;
+    case Screen::Playing:
+        if (current_ >= 0 && current_ < static_cast<int>(levels_.size()) && levels_[current_].isBoss)
+            Audio::PlayMusic(Track::Boss);
+        else
+            Audio::PlayMusic(activeWorld_ == 1 ? Track::Egypt : Track::House);
+        break;
+    default: Audio::PlayMusic(Track::Menu); break;
+    }
 }
 
 // ---------------------------------------------------------------- Intro
 
 void App::UpdateIntro()
 {
+    if (!introSounded_)
+    {
+        introSounded_ = true;
+        Audio::Play(Sfx::Intro);
+    }
     introTime_ += GetFrameTime();
     const bool skip = IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ENTER) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
     if (skip || introTime_ >= IntroLength) screen_ = Screen::Worlds;
@@ -229,6 +275,7 @@ void App::UpdateWorlds()
     else if (activate)
     {
         toastTimer_ = 2.5f; // locked, or not built yet
+        Audio::Play(Sfx::UiLocked);
     }
 }
 
@@ -343,7 +390,7 @@ void App::DrawWorlds() const
             DrawRectangleRounded({bar.x, bar.y, bar.width * cleared / playable, bar.height}, 1.0f, 6, kCleared);
     }
 
-    DrawCentered("Left/Right or mouse to choose   -   Enter or click to play   -   S: shop   -   F11: fullscreen   -   Esc to quit", w / 2, h - 40, 18, GRAY);
+    DrawCentered("Left/Right or mouse to choose   -   Enter or click to play   -   S: shop   -   M: mute   -   F11: fullscreen   -   Esc to quit", w / 2, h - 40, 18, GRAY);
 
     if (toastTimer_ > 0.0f)
     {
@@ -418,7 +465,11 @@ void App::UpdateLevels()
         if (clicked || MouseMoved()) selectedSlot_ = BossSlot;
     }
 
-    if (IsUnlocked(selectedSlot_) && (clicked || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE))) StartLevel(selectedSlot_);
+    const bool activate = clicked || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE);
+    if (activate && IsUnlocked(selectedSlot_))
+        StartLevel(selectedSlot_);
+    else if (activate)
+        Audio::Play(Sfx::UiLocked);
 }
 
 void App::DrawLevels() const
@@ -570,17 +621,20 @@ void App::ActivateShopCard(int index)
         profile_.Equip(id);
         shopToast_ = std::string("Equipped ") + info.name;
         shopToastGood_ = true;
+        Audio::Play(Sfx::ShopEquip);
     }
     else if (profile_.Buy(id))
     {
         profile_.Equip(id);
         shopToast_ = std::string("Bought ") + info.name + "! You're wearing it now.";
         shopToastGood_ = true;
+        Audio::Play(Sfx::ShopBuy);
     }
     else
     {
         shopToast_ = TextFormat("Not enough coins - you need %d more. Beat levels to earn cheese coins!", info.price - profile_.Coins());
         shopToastGood_ = false;
+        Audio::Play(Sfx::ShopFail);
     }
     shopToastTimer_ = 3.0f;
     profile_.Save();

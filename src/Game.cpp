@@ -55,6 +55,11 @@ void Game::Reset()
     bossHitsShown_ = 0;
     bossFlash_ = 0.0f;
     catSeesPlayer_.assign(cats_.size(), false);
+    catSound_.assign(cats_.size(), CatSoundState{});
+    stepDistance_ = 0.0f;
+    stepFlip_ = false;
+    exitWasOpen_ = AllCheeseFound();
+    Audio::DuckMusic(0.0f);
 
     elapsed_ = 0.0f;
     newBest_ = false;
@@ -88,6 +93,11 @@ void Game::Update(float dt)
     if (state_ == State::Playing) UpdateCats(dt);
     if (state_ == State::Playing) UpdateBoss();
     bossFlash_ = std::max(0.0f, bossFlash_ - dt);
+
+    // The exit lights up the moment the last cheese is taken.
+    const bool exitOpen = AllCheeseFound();
+    if (exitOpen && !exitWasOpen_ && state_ == State::Playing) Audio::Play(Sfx::ExitOpen);
+    exitWasOpen_ = exitOpen;
 }
 
 void Game::UpdateBoss()
@@ -129,18 +139,29 @@ void Game::UpdatePlayer(float dt)
         const MouseHole& hole = level_.Holes()[hiddenIn_];
         if (IsKeyPressed(KEY_SPACE) && hole.pair >= 0)
         {
-            EnterHole(hole.pair);
+            EnterHole(hole.pair, true);
             return;
         }
         // You usually arrive holding a direction key; let go first, then press again to leave.
         if (!Player::MovementKeyDown()) waitForKeyRelease_ = false;
         if (waitForKeyRelease_ || !Player::MovementKeyDown()) return;
         hiddenIn_ = -1; // step out (ignoreHole_ stops us from instantly re-entering)
+        Audio::Play(Sfx::HoleExit);
     }
 
     const float cheeseFactor = std::max(MinSpeedFactor, 1.0f - SlowdownPerCheese * static_cast<float>(carriedWeight_));
     player_.SetSpeedMultiplier(cheeseFactor * (boostTimer_ > 0.0f ? PepperBoost : 1.0f));
+    const Vector2 before = player_.Position();
     player_.Update(level_, dt);
+
+    // Tiny footsteps, one every few pixels walked (so a pepper boost pitter-patters faster).
+    stepDistance_ += Vector2Distance(before, player_.Position());
+    if (stepDistance_ >= StepSpacing)
+    {
+        stepDistance_ -= StepSpacing;
+        stepFlip_ = !stepFlip_;
+        Audio::Play(stepFlip_ ? Sfx::Step1 : Sfx::Step2, 0.8f, 0.0f, 0.95f + 0.1f * static_cast<float>(GetRandomValue(0, 100)) / 100.0f);
+    }
     trail_.Record(player_.Position());
 
     // Pick up cheese: it joins the trail behind the mouse.
@@ -149,6 +170,11 @@ void Game::UpdatePlayer(float dt)
         carriedKinds_.push_back(c.kind);
         carriedWeight_ += GetCheeseInfo(c.kind).weight;
         ++carried_;
+        // Each piece in a row is a little higher, so a trail of cheese plays a rising run.
+        if (c.kind == CheeseKind::Golden)
+            Audio::Play(Sfx::GoldenCheese);
+        else
+            Audio::Play(Sfx::Cheese, 1.0f, 0.0f, std::min(1.6f, 1.0f + 0.05f * static_cast<float>(carried_ - 1)));
         return true;
     });
 
@@ -161,6 +187,7 @@ void Game::UpdatePlayer(float dt)
     {
         boostTimer_ = PepperDuration;
         flashPhase_ = 0.0f;
+        Audio::Play(Sfx::Pepper);
     }
 
     const int tx = static_cast<int>(player_.Position().x) / Level::TileSize;
@@ -179,17 +206,20 @@ void Game::UpdatePlayer(float dt)
     // Exit: only usable once every piece of cheese has been picked up.
     if (AllCheeseFound() && level_.At(tx, ty) == Tile::Exit)
     {
-        StoreCheese(player_.Position());
+        StoreCheese(player_.Position(), true);
         state_ = State::Won;
+        Audio::Play(Sfx::Win);
+        Audio::DuckMusic(4.0f);
         firstClear_ = bestTime_ < 0.0f;
         newBest_ = bestTime_ < 0.0f || elapsed_ < bestTime_;
         if (newBest_) bestTime_ = elapsed_;
     }
 }
 
-void Game::EnterHole(int index)
+void Game::EnterHole(int index, bool teleport)
 {
     const MouseHole& hole = level_.Holes()[index];
+    Audio::Play(teleport ? Sfx::HoleTeleport : Sfx::HoleEnter);
     hiddenIn_ = index;
     ignoreHole_ = index;
     waitForKeyRelease_ = true;
@@ -198,9 +228,10 @@ void Game::EnterHole(int index)
     StoreCheese(hole.center);
 }
 
-void Game::StoreCheese(Vector2 where)
+void Game::StoreCheese(Vector2 where, bool silent)
 {
     if (carried_ == 0) return;
+    if (!silent) Audio::Play(Sfx::Store);
     stored_ += carried_;
     for (CheeseKind kind : carriedKinds_) storedCoins_ += GetCheeseInfo(kind).coins;
     popupCount_ = carried_;
@@ -267,6 +298,7 @@ void Game::UpdateCats(float dt)
     {
         Cat& cat = cats_[i];
         cat.Update(level_, dt);
+        CatSounds(i, dt);
 
         catSeesPlayer_[i] = false;
         if (IsHidden()) continue;
@@ -276,12 +308,44 @@ void Game::UpdateCats(float dt)
         if (!cat.IsHarmless() && CheckCollisionCircles(player_.Position(), player_.Radius(), cat.Position(), reach))
         {
             state_ = State::Caught;
+            Audio::Play(Sfx::Caught);
+            Audio::DuckMusic(3.0f);
             return;
         }
 
         catSeesPlayer_[i] = cat.CanSee(level_, player_.Position(), player_.Radius());
         if (catSeesPlayer_[i]) cat.Alert(level_, player_.Position());
+        CatSounds(i, 0.0f);
     }
+}
+
+void Game::CatSounds(size_t index, float dt)
+{
+    const Cat& cat = cats_[index];
+    CatSoundState& was = catSound_[index];
+    const Vector2 at = cat.Position();
+    const Vector2 mouse = player_.Position();
+
+    was.alertCooldown = std::max(0.0f, was.alertCooldown - dt);
+    // (A cat that goes straight into its wind-up already has a sound of its own, so only a plain chase gets the alert.)
+    if (cat.IsChasing() && !was.chasing && !cat.IsWindingUp() && !cat.IsLunging() && was.alertCooldown <= 0.0f)
+    {
+        Audio::PlayAt(Sfx::Alert, at, mouse);
+        was.alertCooldown = 1.5f;
+    }
+    if (cat.IsWindingUp() && !was.windingUp) Audio::PlayAt(Sfx::WindUp, at, mouse);
+    if (cat.IsLunging() && !was.lunging) Audio::PlayAt(Sfx::Pounce, at, mouse);
+
+    if (cat.IsKnockedOut() && !was.knockedOut)
+        Audio::PlayAt(Sfx::BossKo, at, mouse);
+    else if (cat.IsStunned() && !was.stunned)
+        Audio::PlayAt(cat.IsBoss() ? Sfx::BossHit : Sfx::Stun, at, mouse);
+
+    was.chasing = cat.IsChasing();
+    was.windingUp = cat.IsWindingUp();
+    was.lunging = cat.IsLunging();
+    was.stunned = cat.IsStunned();
+    was.knockedOut = cat.IsKnockedOut();
 }
 
 void Game::Draw() const

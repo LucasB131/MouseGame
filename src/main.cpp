@@ -1,6 +1,7 @@
 // Sneak - top-down stealth game
 
 #include "App.h"
+#include "Audio.h"
 #include "Viewport.h"
 #include "raylib.h"
 
@@ -12,6 +13,7 @@ int main()
     SetWindowMinSize(LogicalWidth / 2, LogicalHeight / 2);
     SetExitKey(KEY_NULL); // Esc is handled by the game (back to menu / quit from menu)
     SetTargetFPS(60);
+    Audio::Init();
 
     App app;
     app.Init();
@@ -19,17 +21,21 @@ int main()
     while (!WindowShouldClose())
     {
         HandleFullscreenKeys();
+        Audio::HandleKeys();
         UpdateViewport(); // mouse mapping must be set before the game reads the mouse
         const bool keepGoing = app.Update();
+        Audio::Update(GetFrameTime());
         BeginDrawing();
         ClearBackground(BLACK);
         BeginLogicalView();
         app.Draw();
+        Audio::DrawOverlay();
         EndLogicalView();
         EndDrawing();
         if (!keepGoing) break;
     }
 
+    Audio::Shutdown();
     CloseWindow();
     return 0;
 }
