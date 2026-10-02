@@ -6,6 +6,7 @@
       "displayName": "Debug (MinGW GCC + Ninja)",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/debug",
+      "warnings": { "deprecated": false },
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_C_COMPILER": "C:/msys64/ucrt64/bin/gcc.exe",
