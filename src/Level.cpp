@@ -116,17 +116,19 @@ bool Level::LoadFromFile(const std::string& path)
         }
     }
 
-    // Link holes of the same color in pairs.
+    // Link the holes of each color: a pair goes back and forth, a bigger group loops around in reading order.
     for (int color = 0; color < HoleColorCount; ++color)
     {
         std::vector<int> same;
         for (int i = 0; i < static_cast<int>(holes_.size()); ++i)
             if (holes_[i].color == color) same.push_back(i);
-        if (same.size() > 2) TraceLog(LOG_WARNING, "Level: more than two %s holes; only the first two are linked", HoleColorName(color));
-        if (same.size() >= 2)
+        if (same.size() == 1) TraceLog(LOG_WARNING, "Level: the only %s hole has nothing to link to", HoleColorName(color));
+        for (size_t k = 0; k < same.size(); ++k)
         {
-            holes_[same[0]].pair = same[1];
-            holes_[same[1]].pair = same[0];
+            MouseHole& h = holes_[same[k]];
+            h.group = static_cast<int>(same.size());
+            h.order = static_cast<int>(k) + 1;
+            if (same.size() >= 2) h.pair = same[(k + 1) % same.size()];
         }
     }
 

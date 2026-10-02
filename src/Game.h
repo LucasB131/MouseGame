@@ -78,6 +78,7 @@ private:
     float stepDistance_ = 0.0f;           // distance walked since the last footstep sound
     bool stepFlip_ = false;
     bool exitWasOpen_ = false;
+    float exitOpen_ = 0.0f; // 0..1, how far the exit door has swung open (for drawing)
     struct CheesePiece
     {
         Vector2 pos;

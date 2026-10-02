@@ -14,7 +14,8 @@ public:
     RoomRenderer& operator=(const RoomRenderer&) = delete;
 
     void Build(const Level& level); // call after loading a level (needs an open window)
-    void Draw(const Level& level, bool exitOpen) const;
+    // exitOpen: 0 = the exit door is shut, 1 = wide open and glowing (values in between are the door swinging).
+    void Draw(const Level& level, float exitOpen) const;
 
 private:
     void Release();

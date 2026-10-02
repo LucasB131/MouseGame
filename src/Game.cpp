@@ -59,6 +59,7 @@ void Game::Reset()
     stepDistance_ = 0.0f;
     stepFlip_ = false;
     exitWasOpen_ = AllCheeseFound();
+    exitOpen_ = exitWasOpen_ ? 1.0f : 0.0f;
     Audio::DuckMusic(0.0f);
 
     elapsed_ = 0.0f;
@@ -98,6 +99,8 @@ void Game::Update(float dt)
     const bool exitOpen = AllCheeseFound();
     if (exitOpen && !exitWasOpen_ && state_ == State::Playing) Audio::Play(Sfx::ExitOpen);
     exitWasOpen_ = exitOpen;
+    // The door swings open (or shut again after a restart) over half a second.
+    exitOpen_ = exitOpen ? std::min(1.0f, exitOpen_ + dt * 2.0f) : std::max(0.0f, exitOpen_ - dt * 2.0f);
 }
 
 void Game::UpdateBoss()
@@ -350,7 +353,7 @@ void Game::CatSounds(size_t index, float dt)
 
 void Game::Draw() const
 {
-    renderer_.Draw(level_, AllCheeseFound());
+    renderer_.Draw(level_, exitOpen_);
 
     for (const Cat& cat : cats_) cat.DrawRoute();
 
@@ -426,8 +429,13 @@ void Game::Draw() const
     if (IsHidden())
     {
         const MouseHole& hole = level_.Holes()[hiddenIn_];
-        hint = hole.pair >= 0 ? TextFormat("Hidden!  Space: travel to the other %s hole   Move: leave", HoleColorName(hole.color))
-                              : "Hidden!  Move to leave";
+        if (hole.pair < 0)
+            hint = "Hidden!  Move to leave";
+        else if (hole.group == 2)
+            hint = TextFormat("Hidden!  Space: travel to the other %s hole   Move: leave", HoleColorName(hole.color));
+        else
+            hint = TextFormat("Hidden!  Space: travel to %s hole %d of %d   Move: leave", HoleColorName(hole.color),
+                              level_.Holes()[hole.pair].order, hole.group);
         hintColor = HoleColor(hole.color);
     }
     else if (bossIndex_ >= 0 && !cats_[bossIndex_].IsKnockedOut())
@@ -442,7 +450,7 @@ void Game::Draw() const
     }
     else if (AllCheeseFound())
     {
-        hint = "All cheese found! Get to the exit.";
+        hint = "All cheese found! The mouse door is open - get to it.";
         hintColor = GREEN;
     }
     else

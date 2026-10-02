@@ -4,6 +4,8 @@
 #include <cmath>
 #include <vector>
 
+#include "rlgl.h"
+
 namespace
 {
 constexpr int TS = Level::TileSize;
@@ -1423,6 +1425,176 @@ void DrawHoleArt(const Level& level)
     {
         DrawCircleV(hole.center, 15.0f, Color{18, 14, 14, 255});
         DrawRing(hole.center, 14.0f, 18.0f, 0.0f, 360.0f, 32, HoleColor(hole.color));
+        if (hole.group >= 3)
+        {
+            // Holes that loop around in a bigger group are numbered, so you can tell where Space leads next.
+            const char* label = TextFormat("%d", hole.order);
+            const int size = 18;
+            DrawText(label, static_cast<int>(hole.center.x) - MeasureText(label, size) / 2, static_cast<int>(hole.center.y) - size / 2 + 1, size,
+                     HoleColor(hole.color));
+        }
+    }
+}
+
+// ------------------------------------------------------------------ the exit: a small mouse door set into a wall
+
+// The door sits in the wall tile next to the exit tile (the floor tile you step on to leave).
+struct ExitDoor
+{
+    Vector2 center;  // middle of that wall tile
+    Vector2 outward; // unit vector from the wall into the room
+};
+
+ExitDoor FindExitDoor(const Level& level, int ex, int ey)
+{
+    static const int sides[4][2] = {{0, 1}, {1, 0}, {-1, 0}, {0, -1}}; // wall below, right, left, above
+    for (int pass = 0; pass < 2; ++pass)
+    {
+        for (const auto& s : sides)
+        {
+            const int wx = ex + s[0];
+            const int wy = ey + s[1];
+            if (level.At(wx, wy) != Tile::Wall) continue;
+            if (pass == 0 && wy == 0) continue; // the top bar covers the top row of the room, so prefer any other wall
+            return {{(wx + 0.5f) * TS, (wy + 0.5f) * TS}, {static_cast<float>(-s[0]), static_cast<float>(-s[1])}};
+        }
+    }
+    return {{(ex + 0.5f) * TS, (ey + 1.0f) * TS}, {0.0f, -1.0f}}; // no wall nearby: stand the door on the tile's lower edge
+}
+
+// A soft fan of light: brightest at the origin, fading with distance and toward the sides. Drawn additively.
+void DrawLightCone(Vector2 origin, Vector2 dir, float radius, float halfAngle, Color color, float alpha)
+{
+    constexpr int Segments = 24;
+    constexpr int Rings = 4;
+    static const float ringRadius[Rings] = {0.0f, 0.35f, 0.7f, 1.0f};
+    static const float ringAlpha[Rings] = {1.0f, 0.42f, 0.09f, 0.0f};
+    const float base = std::atan2(dir.y, dir.x);
+    const float r = color.r / 255.0f, g = color.g / 255.0f, b = color.b / 255.0f;
+    auto vertex = [&](int ring, int seg) {
+        const float u = 2.0f * static_cast<float>(seg) / Segments - 1.0f; // -1 .. 1 across the fan
+        const float ang = base + u * halfAngle;
+        const float side = ring == 0 ? 1.0f : std::cos(u * PI * 0.5f);
+        rlColor4f(r, g, b, alpha * ringAlpha[ring] * side);
+        rlVertex2f(origin.x + std::cos(ang) * radius * ringRadius[ring], origin.y + std::sin(ang) * radius * ringRadius[ring]);
+    };
+    rlSetTexture(0);
+    rlBegin(RL_TRIANGLES);
+    for (int i = 0; i < Segments; ++i)
+    {
+        // Angles grow clockwise on screen, so each triangle lists its vertices in the opposite order to face the camera.
+        vertex(0, i); vertex(1, i + 1); vertex(1, i);
+        for (int k = 1; k + 1 < Rings; ++k)
+        {
+            vertex(k, i); vertex(k + 1, i + 1); vertex(k + 1, i);
+            vertex(k, i); vertex(k, i + 1); vertex(k + 1, i + 1);
+        }
+    }
+    rlEnd();
+}
+
+// An arched doorway shape: straight sides with a half-circle on top, inset from the outer frame.
+void DrawArch(Vector2 c, float width, float height, float inset, Color color)
+{
+    const float w = width - 2.0f * inset;
+    const float r = w / 2.0f;
+    const float top = c.y - height / 2.0f + inset;
+    DrawCircleV({c.x, top + r}, r, color);
+    DrawRectangleRec({c.x - r, top + r, w, height - 2.0f * inset - r}, color);
+}
+
+// 'open' runs from 0 (shut and dark) to 1 (swung wide, with warm light pouring out of the room inside).
+void DrawExitDoor(const ExitDoor& door, float open, float t)
+{
+    const float o = open * open * (3.0f - 2.0f * open);
+    const Vector2 c = door.center;
+    const float W = 26.0f, H = 34.0f; // small: only a mouse fits through
+    const Color warm{255, 214, 130, 255};
+    const float flicker = 1.0f + 0.06f * std::sin(t * 3.1f) + 0.04f * std::sin(t * 7.3f + 1.0f);
+
+    if (o > 0.01f)
+    {
+        // Light on the floor in front of the door, a glow around the frame, and a few drifting motes of dust in the beam.
+        const Vector2 mouth{c.x + door.outward.x * TS * 0.5f, c.y + door.outward.y * TS * 0.5f};
+        BeginBlendMode(BLEND_ADDITIVE);
+        DrawLightCone(mouth, door.outward, 78.0f, 1.3f, warm, 0.45f * o * flicker);
+        DrawCircleGradient(static_cast<int>(c.x), static_cast<int>(c.y), 34.0f, Fade(warm, 0.30f * o * flicker), Fade(warm, 0.0f));
+        for (int i = 0; i < 7; ++i)
+        {
+            const float dist = std::fmod(t * 7.0f + i * 11.3f, 62.0f);
+            const float side = std::sin(t * 0.9f + i * 2.1f) * dist * 0.55f;
+            const Vector2 p{mouth.x + door.outward.x * (dist + 4.0f) - door.outward.y * side,
+                            mouth.y + door.outward.y * (dist + 4.0f) + door.outward.x * side};
+            DrawCircleV(p, 1.3f, Fade(Color{255, 240, 200, 255}, 0.55f * o * (1.0f - dist / 62.0f)));
+        }
+        EndBlendMode();
+    }
+
+    // Frame: dark outer edge, then lighter wood, then the opening.
+    DrawArch(c, W, H, -1.5f, Fade(BLACK, 0.35f)); // a little shadow where the frame meets the wall
+    DrawArch(c, W, H, 0.0f, Color{66, 42, 25, 255});
+    DrawArch(c, W, H, 1.5f, Color{124, 82, 48, 255});
+    DrawArch(c, W, H, 4.0f, Color{22, 16, 14, 255});
+
+    // The lit room inside: warm and bright toward the top, golden floor at the bottom.
+    const float inW = W - 8.0f;
+    const float r = inW / 2.0f;
+    const float topY = c.y - H / 2.0f + 4.0f;
+    const float botY = c.y + H / 2.0f - 4.0f;
+    if (o > 0.01f)
+    {
+        const Color glowTop{255, 244, 200, 255}, glowBottom{255, 186, 92, 255};
+        DrawCircleV({c.x, topY + r}, r, glowTop);
+        DrawRectangleGradientV(static_cast<int>(c.x - r), static_cast<int>(topY + r), static_cast<int>(inW), static_cast<int>(botY - topY - r), glowTop, glowBottom);
+        DrawRectangle(static_cast<int>(c.x - r), static_cast<int>(botY) - 4, static_cast<int>(inW), 4, Color{214, 132, 60, 255});
+    }
+
+    // The door leaf, hinged on the left. Closed it fills the opening; opening it swings toward you, so it narrows
+    // and its free edge grows slightly taller.
+    const float angle = o * 1.35f; // about 77 degrees when fully open
+    const float cosA = std::cos(angle), sinA = std::sin(angle);
+    const float hingeX = c.x - r;
+    constexpr int ArcPoints = 10;
+    Vector2 pts[ArcPoints * 2 + 4];
+    int n = 0;
+    auto add = [&](float x, float y) {
+        const float u = (x - hingeX) / inW; // 0 at the hinge, 1 at the free edge
+        const float stretch = 1.0f + 0.16f * sinA * u;
+        pts[n++] = {hingeX + (x - hingeX) * cosA, c.y + (y - c.y) * stretch};
+    };
+    add(c.x - r, botY);
+    add(c.x - r, topY + r);
+    for (int i = 1; i < ArcPoints; ++i)
+    {
+        const float a = PI + PI * static_cast<float>(i) / ArcPoints; // from the left side over the top to the right side
+        add(c.x + std::cos(a) * r, topY + r + std::sin(a) * r);
+    }
+    add(c.x + r, topY + r);
+    add(c.x + r, botY);
+    const Color wood{150, 100, 56, 255}, woodDark{104, 66, 36, 255};
+    std::reverse(pts, pts + n); // the fan must run counter-clockwise on screen
+    DrawTriangleFan(pts, n, Color{static_cast<unsigned char>(wood.r - 30.0f * sinA), static_cast<unsigned char>(wood.g - 22.0f * sinA),
+                                  static_cast<unsigned char>(wood.b - 14.0f * sinA), 255});
+    // Planks and a brass knob on the free edge.
+    const float leafW = inW * cosA;
+    if (leafW > 7.0f)
+    {
+        for (int k = 1; k < 3; ++k)
+        {
+            const float x = hingeX + leafW * k / 3.0f;
+            const float stretch = 1.0f + 0.16f * sinA * (static_cast<float>(k) / 3.0f);
+            DrawLineEx({x, c.y + (topY + r - c.y) * stretch + 4.0f}, {x, c.y + (botY - c.y) * stretch}, 1.0f, woodDark);
+        }
+        const float u = 0.78f;
+        DrawCircleV({hingeX + leafW * u, c.y + 4.0f * (1.0f + 0.16f * sinA * u)}, 1.9f, Color{244, 204, 84, 255});
+    }
+    DrawLineEx(pts[0], pts[1], 1.5f, woodDark); // the thickness of the leaf's free edge
+    DrawLineEx(pts[n - 1], pts[n - 2], 1.0f, woodDark);
+    if (o > 0.01f)
+    {
+        BeginBlendMode(BLEND_ADDITIVE);
+        DrawRing({c.x, topY + r}, r + 0.5f, r + 2.0f, 180.0f, 360.0f, 16, Fade(warm, 0.55f * o * flicker)); // warm light catching the frame
+        EndBlendMode();
     }
 }
 } // namespace
@@ -1459,7 +1631,7 @@ void RoomRenderer::Build(const Level& level)
     EndTextureMode();
 }
 
-void RoomRenderer::Draw(const Level& level, bool exitOpen) const
+void RoomRenderer::Draw(const Level& level, float exitOpen) const
 {
     if (built_)
     {
@@ -1468,18 +1640,9 @@ void RoomRenderer::Draw(const Level& level, bool exitOpen) const
         DrawTextureRec(target_.texture, src, {0, 0}, WHITE);
     }
 
-    // The exit changes when all the cheese is found, so it's drawn live.
+    // The exit door opens when all the cheese is found, so it's drawn live.
+    const float t = static_cast<float>(GetTime());
     for (int y = 0; y < level.Height(); ++y)
-    {
         for (int x = 0; x < level.Width(); ++x)
-        {
-            if (level.At(x, y) != Tile::Exit) continue;
-            const Vector2 c{(x + 0.5f) * TS, (y + 0.5f) * TS};
-            const float pulse = exitOpen ? 2.0f * std::sin(static_cast<float>(GetTime()) * 4.0f) : 0.0f;
-            DrawCircleV(c, 17.0f + pulse, exitOpen ? Fade(Color{60, 200, 110, 255}, 0.35f) : Fade(BLACK, 0.3f));
-            DrawCircleV(c, 14.0f, exitOpen ? Color{60, 200, 110, 255} : Color{25, 25, 25, 255});
-            if (!exitOpen) DrawRing(c, 14.0f, 17.0f, 0, 360, 32, Color{160, 60, 60, 255});
-            DrawText("EXIT", static_cast<int>(c.x) - 12, static_cast<int>(c.y) - 5, 10, exitOpen ? Color{20, 60, 30, 255} : Color{160, 60, 60, 255});
-        }
-    }
+            if (level.At(x, y) == Tile::Exit) DrawExitDoor(FindExitDoor(level, x, y), exitOpen, t);
 }

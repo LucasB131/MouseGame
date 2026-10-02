@@ -14,6 +14,8 @@ Sneak is an independent, non-commercial personal project. It was inspired by the
 - **Four cat types** (tabby, sleepy, hunter and blind) with different speeds and senses, driven by a state machine with A\* pathfinding
 - **Player movement and collision** with walls and furniture
 - **Cheese, mouse holes and peppers:** carried cheese slows you down, holes hide you and bank your haul, and red peppers give a speed boost
+- **A mouse-sized exit:** the exit is a tiny arched door set into the wall, too small for anything but a mouse. It stays shut until you have all the cheese, then swings open and glows as if there were a light inside
+- **Hole networks that change from room to room:** holes come in color-coded groups. A pair links back and forth, while three holes of one color form a loop, numbered so you know where Space will take you
 - **Level progression:** complete a level to unlock the next, with best times saved
 - **A shop** where cheese coins buy mouse and cat skins
 - **An original soundtrack and 26 sound effects:** four music loops (menu, house, pyramid and boss fight) and sounds for footsteps, cheese, holes, cats, menus and the shop. Cat sounds are quieter when the cat is far away and pan left or right to match where it is
@@ -46,7 +48,7 @@ the Treasure Vault):
 |-----|--------|
 | WASD / Arrow keys | Move (and navigate menus) |
 | Enter or click | Choose a world or level, go to the next level after winning, buy or equip in the shop |
-| Space | Skip the intro. Inside a mouse hole: pop out of the linked hole |
+| Space | Skip the intro. Inside a mouse hole: pop out of the next linked hole |
 | S | Open the shop (on the world select) |
 | Tab or Q / E | Switch shop category |
 | F11 or Alt+Enter | Toggle fullscreen |
@@ -58,14 +60,18 @@ the Treasure Vault):
 
 ## How to play
 
-Reach the exit without being caught. The exit only opens once **every piece of cheese** in the room has been collected.
+Reach the exit without being caught. The exit is a tiny door in the wall, sized for a mouse. It stays shut until **every
+piece of cheese** in the room has been collected, then it swings open and glows with warm light from inside.
 
 **Cheese.** Picked-up cheese trails behind you and slows you down (7% per unit of weight, down to 55% of full
 speed). The five kinds are Cheddar, Swiss, Brie, Blue and the heavy **Gouda wheel**, which weighs double.
 
 **Mouse holes.** Walk into any hole to hide: cats cannot see or catch you, and your carried cheese is stored. Holes
-come in color-coded linked pairs. Press Space while hiding to pop out of the matching hole, or press a direction to
-leave the way you came.
+come in color-coded groups, and every room has at least two colors with at least two holes each. Press Space while
+hiding to pop out of the next hole of the same color, or press a direction to leave the way you came. A color with two
+holes is a pair that links back and forth. A color with three holes is a loop: the holes are numbered, and Space takes
+you from 1 to 2, from 2 to 3 and from 3 back to 1, so the hint at the top of the screen tells you where you will come
+out.
 
 **Red peppers.** A 5-second, +50% speed boost. You flash red, and the flashing slows down as it runs out.
 
@@ -197,8 +203,8 @@ Levels are plain text files, so adding or editing one needs no recompiling. Worl
 | `P` | Player start |
 | `C` | Cheese (Cheddar, Swiss, Brie or Blue, chosen from its position) |
 | `O` | Gouda wheel: heavy, counts double for slowdown |
-| `E` | Exit (opens once all cheese is collected) |
-| `1`-`4` | Mouse hole; two holes with the same digit are a linked pair (red, blue, purple, teal) |
+| `E` | Exit: a small door is drawn in the wall next to this tile, and it opens once all cheese is collected |
+| `1`-`4` | Mouse hole (red, blue, purple, teal). Holes with the same digit are linked: two form a pair, three or more form a loop in reading order (left to right, top to bottom) and are numbered on the map |
 | `R` | Red pepper (speed boost) |
 
 Furniture letters are solid, blocking movement and sight like walls:
@@ -214,6 +220,9 @@ Furniture letters are solid, blocking movement and sight like walls:
 | `G` | pool table | `U` | tub / fountain |
 | `N` | column (World 2) | `M` | statue (World 2) |
 | `V` | treasure (World 2) | | |
+
+Keep each `E` on a floor tile beside a side or bottom wall, because the top wall row is covered by the HUD. Give every
+hole digit you use at least two holes, or the game logs a warning that the lone hole has nothing to link to.
 
 Adjacent tiles of the same letter are drawn as one piece, and the art adapts to the room's theme: a `B` shelf holds
 books in the library, jars in the pantry, wine bottles in the cellar and a hieroglyph stele in the pyramid.

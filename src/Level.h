@@ -21,14 +21,18 @@ struct Rug
     Color color{};
 };
 
-// A mouse hole: hides the mouse and stores its cheese. Holes with the same digit are a linked pair.
+// A mouse hole: hides the mouse and stores its cheese. All the holes with the same digit are linked: two holes are a
+// pair, and with three or more, Space takes you to the next one in reading order (top to bottom, left to right) and
+// the last one loops back to the first.
 struct MouseHole
 {
     Vector2 center{};
     int tileX = 0;
     int tileY = 0;
     int color = 0; // 0..3 (digits 1..4 in the level file)
-    int pair = -1; // index of the linked hole, -1 if none
+    int pair = -1; // index of the hole Space leads to (the next one in its group), -1 if it has no partner
+    int group = 1; // how many holes share this digit
+    int order = 1; // this hole's place within its group, 1-based (reading order)
 };
 
 constexpr int HoleColorCount = 4;
@@ -43,7 +47,7 @@ struct CatSpawn
 
 // A grid of tiles loaded from a plain-text file.
 //   '#' wall   '.' floor   'P' player start   'C' cheese   'O' gouda wheel (heavy)   'E' exit
-//   '1'-'4' mouse holes (two holes with the same digit are linked)   'R' red pepper (speed boost)
+//   '1'-'4' mouse holes (holes with the same digit are linked, two or more per digit)   'R' red pepper (speed boost)
 //   furniture letters (see IsFurnitureChar)
 // After the grid and a blank line:
 //   name <text>                              the level's display name
