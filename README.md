@@ -1,37 +1,23 @@
-# MouseGame
+# Sneak
 
-A top-down stealth game written from scratch in C++20 with [raylib](https://www.raylib.com/). You play a small grey
-mouse sneaking through a mansion and, later, an Egyptian pyramid. Slip past patrolling cats, collect every piece of
-cheese, and reach the exit without getting pounced on.
+A 2D stealth game written in C++20 with [Raylib](https://www.raylib.com/). You play a small, quiet mouse sneaking through 30 levels and a secret boss fight, slipping past enemies (cats) that are watching for you.
 
-![Gameplay: the billiards room](docs/gameplay.png)
+Sneak is an independent, non-commercial personal project. It was inspired by the gameplay of a mobile stealth game I enjoyed as a kid, but it is not affiliated with that game or its creators and uses none of its original art, audio, characters, or branding.
 
-## Contents
+![Gameplay](docs/gameplay.png)
 
-- [Overview](#overview)
-- [Screenshots](#screenshots)
-- [Getting started](#getting-started)
-- [How to play](#how-to-play)
-- [Worlds and levels](#worlds-and-levels)
-- [Cats and the cat AI](#cats-and-the-cat-ai)
-- [Shop, coins and skins](#shop-coins-and-skins)
-- [Making your own levels](#making-your-own-levels)
-- [Code layout](#code-layout)
-- [Testing and level validation](#testing-and-level-validation)
-- [Status and planned work](#status-and-planned-work)
-- [Credits](#credits)
+## Features
 
-## Overview
-
-- **31 levels in two worlds**: 25 themed rooms of a house plus a secret boss fight, and the first 5 rooms of a
-  second world set in ancient Egypt.
-- **Four kinds of cat**, each with its own speed, senses and coat, driven by a state machine with A\* pathfinding.
-- **Line-of-sight stealth**: vision cones are raycast through the tile grid, so walls and furniture really do hide you.
-- **Risk and reward**: carried cheese slows you down, mouse holes hide you and bank your haul, and red peppers give
-  a short speed boost.
-- **A shop** where cheese coins buy mouse and cat skins.
-- **All art is drawn in code**: no image assets, so the whole game is C++ source plus plain-text level files.
-- **Fullscreen and resizable window** with a fixed 16:9 layout.
+- **30 playable levels** in two worlds: 25 themed rooms of a house, and the first 5 rooms of an Egyptian pyramid
+- **A secret boss fight** against Sir Pounce, a giant crowned cat, that unlocks World 2
+- **Enemy detection:** cats notice the player by line of sight. Each cat has a vision cone and a range, and the cone is raycast through the tile grid, so walls and furniture block it
+- **Four cat types** (tabby, sleepy, hunter and blind) with different speeds and senses, driven by a state machine with A\* pathfinding
+- **Player movement and collision** with walls and furniture
+- **Cheese, mouse holes and peppers:** carried cheese slows you down, holes hide you and bank your haul, and red peppers give a speed boost
+- **Level progression:** complete a level to unlock the next, with best times saved
+- **A shop** where cheese coins buy mouse and cat skins
+- **Fullscreen support** (F11) with a resizable window
+- **All art drawn in code:** there are no image assets, and levels are plain text files
 
 ## Screenshots
 
@@ -53,9 +39,39 @@ the Treasure Vault):
 
 ![The first five rooms of World 2](docs/world2_rooms.png)
 
-## Getting started
+## Controls
 
-### Requirements
+| Key | Action |
+|-----|--------|
+| WASD / Arrow keys | Move (and navigate menus) |
+| Enter or click | Choose a world or level, go to the next level after winning, buy or equip in the shop |
+| Space | Skip the intro. Inside a mouse hole: pop out of the linked hole |
+| S | Open the shop (on the world select) |
+| Tab or Q / E | Switch shop category |
+| F11 or Alt+Enter | Toggle fullscreen |
+| R | Restart the level |
+| Esc | Back (level -> level select -> world select -> quit) |
+| F1 | Debug view: A\* paths, lunge range and last known positions |
+
+## How to play
+
+Reach the exit without being caught. The exit only opens once **every piece of cheese** in the room has been collected.
+
+**Cheese.** Picked-up cheese trails behind you and slows you down (7% per unit of weight, down to 55% of full
+speed). The five kinds are Cheddar, Swiss, Brie, Blue and the heavy **Gouda wheel**, which weighs double.
+
+**Mouse holes.** Walk into any hole to hide: cats cannot see or catch you, and your carried cheese is stored. Holes
+come in color-coded linked pairs. Press Space while hiding to pop out of the matching hole, or press a direction to
+leave the way you came.
+
+**Red peppers.** A 5-second, +50% speed boost. You flash red, and the flashing slows down as it runs out.
+
+**Getting caught.** A cat that sees you chases you, but you are only caught if it **touches** you. When a cat that
+can see you gets within 110 px it crouches for a quarter of a second (your warning, marked with a red "!!") and then
+dashes up to 150 px in a straight line. Dodge sideways or put something solid between you. A cat that pounces into
+a wall or piece of furniture is dazed for 1.8 seconds and cannot see or move.
+
+## Requirements
 
 - Windows with [MSYS2](https://www.msys2.org/) (UCRT64 environment) providing `gcc`, `cmake` and `ninja`
 - [Git](https://git-scm.com/)
@@ -65,7 +81,7 @@ The provided CMake presets expect MSYS2 in `C:/msys64`. If it lives elsewhere, e
 `CMakePresets.json`. The code itself is portable C++20 and raylib supports other platforms, but only the Windows /
 MinGW setup is configured here.
 
-### Build and run
+## Build and run
 
 ```bash
 git clone https://github.com/LucasB131/MouseGame.git
@@ -81,41 +97,10 @@ to the executable and links the MinGW runtime statically, so the `.exe` runs on 
 In VS Code, install the *C/C++* and *CMake Tools* extensions, open the folder, choose the **debug** preset and press
 **F5**.
 
-### Save data
+## Save data
 
 Progress is stored in plain text files next to the executable: `save_world1.txt` and `save_world2.txt` (best time per
 level) and `profile.txt` (coins, owned skins and what you are wearing). Delete them to start over.
-
-## How to play
-
-Reach the exit without being caught, but the exit only opens once **every piece of cheese** in the room has been
-collected.
-
-| Key | Action |
-|-----|--------|
-| WASD / Arrow keys | Move (and navigate menus) |
-| Enter or click | Choose a world or level, go to the next level after winning, buy or equip in the shop |
-| Space | Skip the intro. Inside a mouse hole: pop out of the linked hole |
-| S | Open the shop (on the world select) |
-| Tab or Q / E | Switch shop category |
-| F11 or Alt+Enter | Toggle fullscreen |
-| R | Restart the level |
-| Esc | Back (level -> level select -> world select -> quit) |
-| F1 | Debug view: A\* paths, lunge range and last known positions |
-
-**Cheese.** Picked-up cheese trails behind you and slows you down (7% per unit of weight, down to 55% of full
-speed). The five kinds are Cheddar, Swiss, Brie, Blue and the heavy **Gouda wheel**, which weighs double.
-
-**Mouse holes.** Walk into any hole to hide: cats cannot see or catch you, and your carried cheese is stored. Holes
-come in color-coded linked pairs. Press Space while hiding to pop out of the matching hole, or press a direction to
-leave the way you came.
-
-**Red peppers.** A 5-second, +50% speed boost. You flash red, and the flashing slows down as it runs out.
-
-**Getting caught.** A cat that sees you chases you, but you are only caught if it **touches** you. When a cat that
-can see you gets within 110 px it crouches for a quarter of a second (your warning, marked with a red "!!") and then
-dashes up to 150 px in a straight line. Dodge sideways or put something solid between you. A cat that pounces into
-a wall or piece of furniture is dazed for 1.8 seconds and cannot see or move.
 
 ## Worlds and levels
 
@@ -229,7 +214,18 @@ cat sleepy 24,7
   coordinates. It walks them forward, then back. Consecutive waypoints need a clear straight path, otherwise the game
   logs a warning. A cat with one waypoint stays put: sleepy cats nap there and others slowly turn in place.
 
-## Code layout
+## Project Structure
+
+```
+MouseGame/
+├── src/              C++ source files (game loop, player, cats, levels, rendering, menus)
+├── assets/levels/    Level files: level1-25.txt, boss1.txt and w2_level1-5.txt
+├── docs/             Screenshots used in this README
+├── CMakeLists.txt    Build configuration (raylib is downloaded automatically)
+├── CMakePresets.json Debug and release presets for MinGW + Ninja
+├── LICENSE
+└── README.md
+```
 
 | Path | Responsibility |
 |------|----------------|
@@ -248,28 +244,52 @@ cat sleepy 24,7
 | `src/Skins.*`, `src/Profile.*` | The skin catalog; coins, owned skins and equipped skins, saved to `profile.txt` |
 | `assets/levels/` | Level files |
 
+## How It Works
+
+- **Game loop:** a standard Raylib loop that handles input, updates game state, and draws each frame at a fixed 1280x720 logical resolution that is scaled to the window.
+- **Levels:** each level is loaded from a plain text file (see [Making your own levels](#making-your-own-levels)), so adding a level does not require changing the core systems.
+- **Enemies:** every frame each cat checks whether the mouse is within range, inside its vision cone, and not hidden behind a wall (a ray is cast through the tile grid). It then moves through its state machine: patrol, investigate, wind-up, lunge, stunned, search and return.
+- **Collision:** the mouse is a circle tested against the solid tiles of the grid. Cats reuse the same tile queries, and a cat that lunges into a wall or furniture is stunned.
+- **Rendering:** each room is drawn once into a cached texture, and only the moving parts are drawn each frame.
+
 ## Testing and level validation
 
-Every level was validated with an offline solver during development: it runs the real cat code, models the cheese
-slowdown and mouse holes, and searches for a route that collects everything and exits without ever being seen. All
-31 levels have such a route, including with the mouse moving 40% slower than the real speed. The boss fight was
+All 30 regular levels were validated with an offline solver during development: it runs the real cat code, models
+the cheese slowdown and mouse holes, and searches for a route that collects everything and exits without ever being
+seen, using a movement schedule slower than the real mouse so a found route has some margin. The boss fight was
 checked with a bot that plays through real key presses: it wins without being caught even when it reacts 0.3 seconds
 late, and a player who never dodges is caught. Menus, saves, the shop and fullscreen mouse mapping were checked with
 scripted input and screenshots. These test tools are not part of this repository.
 
-## Status and planned work
+## Roadmap
 
-Playable now: World 1 (25 levels and the boss), the first 5 rooms of World 2, the shop and skins, and fullscreen.
+- [x] World 1: 25 levels and the secret boss
+- [x] Shop with mouse and cat skins
+- [x] Fullscreen support
+- [x] World 2: the first 5 rooms (Egypt wing)
+- [ ] Soundtrack and sound effects
+- [ ] The remaining 20 rooms of World 2 (ancient Greece and Rome, a medieval castle, Asia, Versailles and a futuristic lab)
+- [ ] Lives and respawning at the last mouse hole
+- [ ] Worlds 3-5
 
-Planned:
+## What I Learned
 
-- Sound effects and a soundtrack
-- Lives and respawning at the last mouse hole
-- The remaining 20 rooms of World 2 (ancient Greece and Rome, a medieval castle, Asia, Versailles and a futuristic lab)
-- Worlds 3-5
+Building Sneak independently taught me how to structure a larger C++ project, manage game state across many levels, and debug problems. It also covered tile-based collision, raycast line of sight, A\* pathfinding and finite-state machines for enemy behavior.
 
 ## Credits
 
-Designed and programmed by Lucas ([@LucasB131](https://github.com/LucasB131)). Built with
-[raylib](https://github.com/raysan5/raylib) 5.5 (zlib license). All characters, levels and art were created for this
-project.
+Game code, design, and level layouts by Lucas Brand. All characters, levels and art were created for this project and are drawn in code. There are no audio or third-party art assets.
+
+Built with [Raylib](https://www.raylib.com/), which is distributed under the zlib/libpng license.
+
+## License
+
+Released under the [MIT License](LICENSE).
+
+## Disclaimer
+
+Sneak is a fan-inspired, non-commercial project. It is not affiliated with, endorsed by, or sponsored by the creators or publishers of any other game, and it contains no assets taken from any other game.
+
+## Contact
+
+Lucas Brand | [GitHub: LucasB131](https://github.com/LucasB131) | brand.180@osu.edu
