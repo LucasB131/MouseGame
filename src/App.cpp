@@ -172,7 +172,7 @@ void App::DrawIntro() const
     DrawCheeseSprite(CheeseKind::Gouda, {w / 2.0f + 150, h / 2.0f - 70}, PI, 3.2f);
     DrawCheeseSprite(CheeseKind::Swiss, {w / 2.0f + 215, h / 2.0f - 40}, -2.4f, 2.0f);
 
-    DrawCentered("MouseGame", w / 2, h / 2 + 30, 90, GOLD);
+    DrawCentered("Sneak", w / 2, h / 2 + 30, 90, GOLD);
     DrawCentered(kCredit, w / 2, h / 2 + 130, 26, LIGHTGRAY);
 
     // Fade everything in and out with one overlay.
@@ -238,8 +238,8 @@ void App::DrawWorlds() const
     const int h = LogicalHeight;
     DrawBackground();
 
-    DrawCentered("MouseGame", w / 2 + 4, 44, 80, {0, 0, 0, 120});
-    DrawCentered("MouseGame", w / 2, 40, 80, GOLD);
+    DrawCentered("Sneak", w / 2 + 4, 44, 80, {0, 0, 0, 120});
+    DrawCentered("Sneak", w / 2, 40, 80, GOLD);
     DrawCentered("Choose a world", w / 2, 132, 26, LIGHTGRAY);
 
     // Shop button with the coin balance, top right.

@@ -1,4 +1,4 @@
-// MouseGame - top-down stealth game (working title)
+// Sneak - top-down stealth game
 
 #include "App.h"
 #include "Viewport.h"
@@ -8,7 +8,7 @@ int main()
 {
     // The window starts at the logical size (32 x 18 tiles of 40 px) but can be resized, and F11 goes fullscreen.
     SetConfigFlags(FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
-    InitWindow(LogicalWidth, LogicalHeight, "MouseGame");
+    InitWindow(LogicalWidth, LogicalHeight, "Sneak");
     SetWindowMinSize(LogicalWidth / 2, LogicalHeight / 2);
     SetExitKey(KEY_NULL); // Esc is handled by the game (back to menu / quit from menu)
     SetTargetFPS(60);

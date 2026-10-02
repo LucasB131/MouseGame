@@ -84,14 +84,14 @@ MinGW setup is configured here.
 ## Build and run
 
 ```bash
-git clone https://github.com/LucasB131/MouseGame.git
-cd MouseGame
+git clone https://github.com/LucasB131/Sneak.git
+cd Sneak
 cmake --preset release
 cmake --build --preset release
-./build/release/MouseGame.exe
+./build/release/Sneak.exe
 ```
 
-Use `debug` instead of `release` for a debug build (`./build/debug/MouseGame.exe`). The build copies `assets/` next
+Use `debug` instead of `release` for a debug build (`./build/debug/Sneak.exe`). The build copies `assets/` next
 to the executable and links the MinGW runtime statically, so the `.exe` runs on its own.
 
 In VS Code, install the *C/C++* and *CMake Tools* extensions, open the folder, choose the **debug** preset and press
@@ -217,7 +217,7 @@ cat sleepy 24,7
 ## Project Structure
 
 ```
-MouseGame/
+Sneak/
 ├── src/              C++ source files (game loop, player, cats, levels, rendering, menus)
 ├── assets/levels/    Level files: level1-25.txt, boss1.txt and w2_level1-5.txt
 ├── docs/             Screenshots used in this README
