@@ -16,7 +16,11 @@ FetchContent_Declare(
     GIT_SHALLOW    TRUE
     SYSTEM          # treat raylib headers as system headers (no warnings from them)
 )
+# raylib 5.5 declares an old cmake_minimum_required, which newer CMake versions warn about. The warning is harmless
+# and comes from raylib itself, so it is silenced only while raylib is configured.
+set(CMAKE_WARN_DEPRECATED OFF)
 FetchContent_MakeAvailable(raylib)
+unset(CMAKE_WARN_DEPRECATED)
 
 # --- game executable ---
 file(GLOB_RECURSE GAME_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/*.cpp)
